@@ -1,0 +1,41 @@
+:root { --sidebar-w: 380px; --divider-w: 10px; }
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; background:#0b0b0f; color:#e7e7ea; overflow: hidden; font-family: system-ui, Segoe UI, Roboto, sans-serif; }
+
+/* Grid: panel | divider | content */
+#split { display: grid; grid-template-columns: var(--sidebar-w) var(--divider-w) 1fr; height: 100vh; }
+
+#panel, #content { min-width: 0; min-height: 0; }
+#panel { background:#0b0b0f; border-right:1px solid #222; height:100vh; overflow-y:auto; overflow-x:hidden; }
+
+#divider { background:#17171e; cursor: col-resize; width: var(--divider-w); }
+#divider:hover { background:#222; }
+
+#content { position: relative; overflow: hidden; height:100%; background:#000; }
+
+/* UI */
+header { padding:12px 12px 6px 12px; border-bottom:1px solid #222; position: sticky; top:0; background:#0b0b0f; z-index:1; }
+h1 { margin:0 0 10px; font-size:18px; }
+.toolbar { display:flex; gap:6px; flex-wrap:wrap; }
+.toolbar button { background:#1b1b22; color:#e7e7ea; border:1px solid #333; border-radius:8px; padding:6px 10px; }
+#finishReshapeBtn { background:#ffd800; color:#000; }
+[data-hidden="true"] { display:none; }
+
+.inputs { display:grid; grid-template-columns: 1fr; gap:8px; padding:10px 12px; border-bottom:1px solid #222; }
+.inputs label { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.inputs input { width:140px; background:#1b1b22; color:#e7e7ea; border:1px solid #333; border-radius:8px; padding:6px 10px; }
+.chk { display:flex; align-items:center; gap:8px; }
+
+.stats { display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:12px; }
+.card { background:#121217; border:1px solid #262636; border-radius:14px; padding:10px 12px; }
+.label { font-size:12px; color:#9aa; text-transform:uppercase; letter-spacing:.06em; }
+.value { font-size:24px; font-weight:800; }
+.sub { font-size:12px; color:#7b7b8a; }
+
+.debugToggle { padding: 0 12px 12px 12px; border-bottom:1px solid #222; }
+
+/* Debug canvases smaller to avoid cropping on narrow panel */
+.debug { display:grid; grid-template-columns: 1fr; gap:10px; padding:12px; }
+.debug canvas { background:#111; border:1px solid #333; border-radius:8px; height:130px; width:100%; image-rendering: pixelated; }
+.hidden { display:none; }

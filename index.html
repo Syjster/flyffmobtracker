@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Mob XP Tracker</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div id="split">
+    <aside id="panel">
+      <header>
+        <h1>Mob XP Tracker</h1>
+        <div class="toolbar">
+          <button id="setRoiAtMouseBtn">Capture XP Bar</button>
+          <button id="reshapeBtn">Fine-Tune Capture</button>
+          <button id="finishReshapeBtn" data-hidden="true">Finish Fine-Tuning</button>
+
+          <button id="startBtn">Start</button>
+          <button id="stopBtn">Stop</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+
+        <div class="inputs">
+          <label>Total XP per kill (%) <input id="xpPerKill" type="text" value="0.0500" /></label>
+          <label>Pixel diff to trigger <input id="diffTrigger" type="text" value="0.065" /></label>
+          <label>Capture cooldown (ms) <input id="diffCooldown" type="text" value="800" /></label>
+        </div>
+
+        <div class="stats">
+          <div class="card"><div class="label">Elapsed</div><div id="elapsed" class="value">00:00:00</div></div>
+          <div class="card"><div class="label">Kills</div><div id="kills" class="value">0</div></div>
+          <div class="card"><div class="label">Total XP%</div><div id="xp" class="value">0.0000%</div></div>
+          <div class="card">
+            <div class="label">XP/hr</div>
+            <div id="xphr" class="value">0.0000%</div>
+            <div id="mobsHr" class="sub">0.0 mobs/hr</div>
+          </div>
+        </div>
+
+        <div class="debugToggle">
+          <label class="chk"><input type="checkbox" id="debugChk" /> Debug</label>
+        </div>
+      </header>
+
+      <section id="debugRow" class="debug hidden">
+        <div class="dbgCol">
+          <div class="dbgLabel">ROI Preview</div>
+          <canvas id="rawC"></canvas>
+        </div>
+        <div class="dbgCol">
+          <div class="dbgLabel">Downscaled (for diff)</div>
+          <canvas id="miniC"></canvas>
+        </div>
+        <div class="dbgCol">
+          <div class="dbgLabel">Diff heat</div>
+          <canvas id="diffC"></canvas>
+        </div>
+      </section>
+    </aside>
+
+    <div id="divider" title="Drag to resize"></div>
+
+    <main id="content"></main> <!-- BrowserView fills this -->
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
