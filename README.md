@@ -3,7 +3,7 @@
 Electron-based XP/Mob tracker for Flyff Universe.
 
 ## Download
-Grab the **Setup** or **Portable** EXE from the [Releases](https://github.com/Syjster/kill_counterv2/releases).
+Grab the **Setup** or **Portable** EXE from the [Releases](https://github.com/Syjster/flyffmobtracker/releases).
 
 ## Usage
 1. **Capture XP Bar** (hover your mouse over your Status Window shortcut T in Flyff U).
