@@ -1,6 +1,6 @@
-# Kill Counter
+# Flyff Mob Tracker
 
-Electron-based XP/Kill tracker for Flyff Universe.
+Electron-based XP/Mob tracker for Flyff Universe.
 
 ## Download
 Grab the **Setup** or **Portable** EXE from the [Releases](https://github.com/Syjster/kill_counterv2/releases).
