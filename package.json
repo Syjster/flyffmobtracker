@@ -1,27 +1,30 @@
 {
-  "name": "kill_counterv2",
-  "version": "1.0.0",
-  "description": "Flyff XP tracker (BrowserView + safe ROI capture + fine-tune overlay)",
+  "name": "flyffmobtracker",
+  "version": "1.1.0",
+  "description": "Flyff Mob Tracker — an XP and mob counter for Flyff Universe.",
   "main": "main.js",
-  "author": "Daniel",
+  "author": "Syjster",
   "license": "MIT",
-  "homepage": "https://github.com/Syjster/kill_counterv2",
+  "homepage": "https://github.com/Syjster/flyffmobtracker",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Syjster/kill_counterv2.git"
+    "url": "https://github.com/Syjster/flyffmobtracker.git"
   },
   "scripts": {
     "start": "electron .",
-    "pack": "electron-builder --dir",
     "dist": "electron-builder -w nsis portable --x64 --publish never"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "openai": "^5.10.0"
   },
   "devDependencies": {
     "electron": "^32.0.0",
     "electron-builder": "^24.13.3"
   },
   "build": {
-    "appId": "com.syjster.killcounterv2",
-    "productName": "Kill Counter v2",
+    "appId": "com.syjster.flyffmobtracker",
+    "productName": "Flyff Mob Tracker",
     "files": [
       "main.js",
       "preload.js",
@@ -36,20 +39,36 @@
     },
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
         "portable"
       ]
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": false,
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "artifactName": "Kill Counter v2 Setup ${version}.exe"
+      "artifactName": "Flyff Mob Tracker Setup ${version}.exe"
     },
     "portable": {
-      "artifactName": "Kill Counter v2 Portable ${version}.exe"
+      "artifactName": "Flyff Mob Tracker Portable ${version}.exe"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities",
+      "hardenedRuntime": true
+    },
+    "dmg": {
+      "artifactName": "Flyff Mob Tracker-${version}.dmg"
     }
   }
 }
