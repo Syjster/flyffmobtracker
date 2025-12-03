@@ -1,66 +1,139 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Mob XP Tracker</title>
+  <title>Flyff Mob Tracker</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <div id="split">
-    <aside id="panel">
-      <header>
-        <h1>Mob XP Tracker</h1>
-        <div class="toolbar">
-          <button id="setRoiAtMouseBtn">Capture XP Bar</button>
-          <button id="reshapeBtn">Fine-Tune Capture</button>
-          <button id="finishReshapeBtn" data-hidden="true">Finish Fine-Tuning</button>
+  <div id="root">
+    <!-- Slim sidebar -->
+    <aside id="sidebar">
+      <div class="sidebar-inner">
+        <header class="sidebar-header">
+          <h1>Flyff Mob Tracker</h1>
 
-          <button id="startBtn">Start</button>
-          <button id="stopBtn">Stop</button>
-          <button id="resetBtn">Reset</button>
-        </div>
-
-        <div class="inputs">
-          <label>Total XP per kill (%) <input id="xpPerKill" type="text" value="0.0500" /></label>
-          <label>Pixel diff to trigger <input id="diffTrigger" type="text" value="0.065" /></label>
-          <label>Capture cooldown (ms) <input id="diffCooldown" type="text" value="800" /></label>
-        </div>
-
-        <div class="stats">
-          <div class="card"><div class="label">Elapsed</div><div id="elapsed" class="value">00:00:00</div></div>
-          <div class="card"><div class="label">Kills</div><div id="kills" class="value">0</div></div>
-          <div class="card"><div class="label">Total XP%</div><div id="xp" class="value">0.0000%</div></div>
-          <div class="card">
-            <div class="label">XP/hr</div>
-            <div id="xphr" class="value">0.0000%</div>
-            <div id="mobsHr" class="sub">0.0 mobs/hr</div>
+          <!-- Capture + Fine-tune -->
+          <div class="button-row">
+            <button id="captureBtn" class="btn btn-main">Capture</button>
+            <button id="fineTuneBtn" class="btn btn-main-outline">Fine-tune</button>
           </div>
-        </div>
 
-        <div class="debugToggle">
-          <label class="chk"><input type="checkbox" id="debugChk" /> Debug</label>
-        </div>
-      </header>
+          <!-- Start / Stop / Reset (one per row) -->
+          <div class="button-column">
+            <button id="startBtn" class="btn btn-start">Start</button>
+            <button id="stopBtn" class="btn btn-stop">Stop</button>
+            <button id="resetBtn" class="btn btn-reset">Reset</button>
+          </div>
+        </header>
 
-      <section id="debugRow" class="debug hidden">
-        <div class="dbgCol">
-          <div class="dbgLabel">ROI Preview</div>
-          <canvas id="rawC"></canvas>
-        </div>
-        <div class="dbgCol">
-          <div class="dbgLabel">Downscaled (for diff)</div>
-          <canvas id="miniC"></canvas>
-        </div>
-        <div class="dbgCol">
-          <div class="dbgLabel">Diff heat</div>
-          <canvas id="diffC"></canvas>
-        </div>
-      </section>
+        <!-- Settings -->
+        <section class="section settings">
+          <div class="section-title">Settings</div>
+
+          <label class="field">
+            <span class="field-label">XP per kill (%)</span>
+            <input id="xpPerKill" type="text" class="field-input" value="0.0500" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Pixel diff to trigger (%)</span>
+            <input id="diffTrigger" type="text" class="field-input" value="6.5" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">Cooldown (ms)</span>
+            <input id="diffCooldown" type="text" class="field-input" value="800" />
+          </label>
+
+          <label class="field">
+            <span class="field-label">GPT calibration kills</span>
+            <input id="calibKills" type="number" min="1" max="20" value="3" class="field-input small" />
+          </label>
+
+          <!-- GPT button on its own row -->
+          <button id="calibBtn" class="btn btn-gpt full-width-btn">GPT Auto XP</button>
+        </section>
+
+        <!-- Stats: one per row, big numbers -->
+        <section class="section stats">
+          <div class="section-title">Session</div>
+
+          <div class="stat-card">
+            <div class="stat-label">Elapsed</div>
+            <div id="elapsed" class="stat-value">00:00:00</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Kills</div>
+            <div id="kills" class="stat-value">0</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Total XP</div>
+            <div id="xp" class="stat-value">0.0000%</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">XP/hr</div>
+            <div id="xphr" class="stat-value">0.0000%</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">GPT XP</div>
+            <div id="gptXp" class="stat-value">--.--%</div>
+          </div>
+
+          <div class="stat-card">
+            <div class="stat-label">Mobs to Level</div>
+            <div id="mobsToLevel" class="stat-value">--</div>
+          </div>
+        </section>
+
+        <!-- Debug section -->
+        <section class="section debug-section">
+          <label class="debug-toggle">
+            <input type="checkbox" id="debugChk" />
+            <span>Show debug previews</span>
+          </label>
+
+          <div class="debug-previews">
+            <canvas id="rawC"></canvas>
+            <canvas id="miniC"></canvas>
+            <canvas id="diffC"></canvas>
+          </div>
+        </section>
+      </div>
     </aside>
 
-    <div id="divider" title="Drag to resize"></div>
+    <!-- Game area (BrowserView is positioned over this) -->
+    <main id="gameContainer"></main>
+  </div>
 
-    <main id="content"></main> <!-- BrowserView fills this -->
+  <!-- ROI overlay for fine-tune -->
+  <div id="roiOverlay" class="roi-overlay hidden">
+    <div class="roi-dialog">
+      <div class="roi-header">
+        <div class="roi-title">Fine-Tune XP Bar Capture</div>
+        <div class="roi-subtitle">Drag the yellow box. Corners resize. Click Save when done.</div>
+      </div>
+
+      <div class="roi-canvas-wrap">
+        <canvas id="roiCanvas"></canvas>
+        <div id="roiBox" class="roi-box">
+          <!-- Drag handles (renderer.js uses classes "h" + corner name) -->
+          <div class="handle h tl"></div>
+          <div class="handle h tr"></div>
+          <div class="handle h bl"></div>
+          <div class="handle h br"></div>
+        </div>
+      </div>
+
+      <div class="roi-actions">
+        <button id="roiCancelBtn" class="btn btn-secondary">Cancel</button>
+        <button id="roiApplyBtn" class="btn btn-main">Save ROI</button>
+      </div>
+    </div>
   </div>
 
   <script src="renderer.js"></script>

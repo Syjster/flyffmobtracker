@@ -1,41 +1,385 @@
-:root { --sidebar-w: 380px; --divider-w: 10px; }
+/* ---------- Base ---------- */
 
-* { box-sizing: border-box; }
-html, body { height: 100%; margin: 0; background:#0b0b0f; color:#e7e7ea; overflow: hidden; font-family: system-ui, Segoe UI, Roboto, sans-serif; }
+* {
+  box-sizing: border-box;
+}
 
-/* Grid: panel | divider | content */
-#split { display: grid; grid-template-columns: var(--sidebar-w) var(--divider-w) 1fr; height: 100vh; }
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  background: #05060b;
+  color: #e9ecff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
 
-#panel, #content { min-width: 0; min-height: 0; }
-#panel { background:#0b0b0f; border-right:1px solid #222; height:100vh; overflow-y:auto; overflow-x:hidden; }
+/* ---------- Layout ---------- */
 
-#divider { background:#17171e; cursor: col-resize; width: var(--divider-w); }
-#divider:hover { background:#222; }
+#root {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
 
-#content { position: relative; overflow: hidden; height:100%; background:#000; }
+/* Slimmer sidebar */
+#sidebar {
+  width: 240px;
+  max-width: 260px;
+  min-width: 220px;
+  background: #070814;
+  border-right: 1px solid #161827;
+  display: flex;
+  flex-direction: column;
+}
 
-/* UI */
-header { padding:12px 12px 6px 12px; border-bottom:1px solid #222; position: sticky; top:0; background:#0b0b0f; z-index:1; }
-h1 { margin:0 0 10px; font-size:18px; }
-.toolbar { display:flex; gap:6px; flex-wrap:wrap; }
-.toolbar button { background:#1b1b22; color:#e7e7ea; border:1px solid #333; border-radius:8px; padding:6px 10px; }
-#finishReshapeBtn { background:#ffd800; color:#000; }
-[data-hidden="true"] { display:none; }
+.sidebar-inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 8px 8px 10px 8px;
+}
 
-.inputs { display:grid; grid-template-columns: 1fr; gap:8px; padding:10px 12px; border-bottom:1px solid #222; }
-.inputs label { display:flex; justify-content:space-between; gap:10px; align-items:center; }
-.inputs input { width:140px; background:#1b1b22; color:#e7e7ea; border:1px solid #333; border-radius:8px; padding:6px 10px; }
-.chk { display:flex; align-items:center; gap:8px; }
+/* Game area */
+#gameContainer {
+  flex: 1;
+  background: #000;
+}
 
-.stats { display:grid; grid-template-columns: 1fr 1fr; gap:10px; padding:12px; }
-.card { background:#121217; border:1px solid #262636; border-radius:14px; padding:10px 12px; }
-.label { font-size:12px; color:#9aa; text-transform:uppercase; letter-spacing:.06em; }
-.value { font-size:24px; font-weight:800; }
-.sub { font-size:12px; color:#7b7b8a; }
+/* ---------- Header & Buttons ---------- */
 
-.debugToggle { padding: 0 12px 12px 12px; border-bottom:1px solid #222; }
+.sidebar-header {
+  padding: 2px 2px 8px 2px;
+  border-bottom: 1px solid #161827;
+}
 
-/* Debug canvases smaller to avoid cropping on narrow panel */
-.debug { display:grid; grid-template-columns: 1fr; gap:10px; padding:12px; }
-.debug canvas { background:#111; border:1px solid #333; border-radius:8px; height:130px; width:100%; image-rendering: pixelated; }
-.hidden { display:none; }
+.sidebar-header h1 {
+  margin: 0 0 8px 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+/* Buttons */
+
+.btn {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  background: #141626;
+  color: #e9ecff;
+  transition: background 0.12s ease, transform 0.05s ease, box-shadow 0.05s ease;
+}
+
+.btn:hover {
+  background: #1d2033;
+}
+
+.btn-main {
+  background: #3f7cff;
+  border-color: #4c87ff;
+  color: #ffffff;
+}
+
+.btn-main:hover {
+  background: #356cf0;
+}
+
+.btn-main-outline {
+  background: #101223;
+  border-color: #3f7cff;
+  color: #cfd8ff;
+}
+
+.btn-start {
+  background: #1c9a4b;
+  border-color: #25b75c;
+}
+
+.btn-start:hover {
+  background: #188541;
+}
+
+.btn-stop {
+  background: #b3261e;
+  border-color: #d4362e;
+}
+
+.btn-stop:hover {
+  background: #972018;
+}
+
+.btn-reset {
+  background: #141626;
+  border-color: #272a3e;
+}
+
+.btn-reset:hover {
+  background: #1b1d2f;
+}
+
+.btn-secondary {
+  background: #141626;
+  border-color: #2c3049;
+}
+
+.btn-gpt {
+  background: #9a6bff;
+  border-color: #b284ff;
+  color: #fff;
+}
+
+.btn-gpt:hover {
+  background: #8755f3;
+}
+
+/* Click feedback from JS */
+.btn-flash {
+  transform: translateY(1px);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15) inset;
+}
+
+/* Layout for buttons */
+
+.button-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.button-column {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.full-width-btn {
+  width: 100%;
+  margin-top: 4px;
+}
+
+/* ---------- Settings ---------- */
+
+.section {
+  margin-top: 8px;
+  padding: 6px 2px 8px 2px;
+  border-bottom: 1px solid #111324;
+}
+
+.section-title {
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: #757b9a;
+  margin-bottom: 6px;
+}
+
+.settings .field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.field-label {
+  font-size: 11px;
+  color: #a4aac7;
+  margin-right: 6px;
+}
+
+.field-input {
+  width: 110px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  border: 1px solid #262a40;
+  background: #101223;
+  color: #e9ecff;
+  font-size: 12px;
+}
+
+.field-input.small {
+  width: 60px;
+}
+
+/* ---------- Stats ---------- */
+
+.stats {
+  padding-top: 4px;
+}
+
+.stat-card {
+  background: #090a18;
+  border-radius: 14px;
+  border: 1px solid #202337;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 6px;
+}
+
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #858bb0;
+}
+
+.stat-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+/* ---------- Debug ---------- */
+
+.debug-section {
+  padding-bottom: 0;
+}
+
+.debug-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: #a4aac7;
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.debug-toggle input {
+  accent-color: #3f7cff;
+}
+
+.debug-previews {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 4px;
+}
+
+.debug-previews canvas {
+  width: 100%;
+  height: 60px;
+  border-radius: 8px;
+  border: 1px solid #202337;
+  background: #05060e;
+  display: none; /* renderer.js turns these on when debug is checked */
+}
+
+/* ---------- ROI Overlay ---------- */
+
+.roi-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.roi-overlay.hidden {
+  display: none;
+}
+
+.roi-dialog {
+  width: 900px;
+  max-width: 96vw;
+  max-height: 90vh;
+  background: #060712;
+  border-radius: 14px;
+  border: 1px solid #262a40;
+  padding: 12px 14px 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.roi-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.roi-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.roi-subtitle {
+  font-size: 12px;
+  color: #a4aac7;
+}
+
+.roi-canvas-wrap {
+  position: relative;
+  background: #000;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #202337;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#roiCanvas {
+  max-width: 100%;
+  max-height: 70vh;
+  display: block;
+}
+
+/* Yellow ROI box */
+.roi-box {
+  position: absolute;
+  border: 2px solid #ffd800;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+
+/* Handles — renderer.js checks class "h" + corner name */
+.handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: #ffd800;
+  border: 1px solid #000;
+}
+
+.handle.tl {
+  left: -5px;
+  top: -5px;
+  cursor: nwse-resize;
+}
+
+.handle.tr {
+  right: -5px;
+  top: -5px;
+  cursor: nesw-resize;
+}
+
+.handle.bl {
+  left: -5px;
+  bottom: -5px;
+  cursor: nesw-resize;
+}
+
+.handle.br {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+/* ROI actions */
+
+.roi-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}

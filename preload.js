@@ -1,21 +1,28 @@
-// preload.js — safe bridge
-const { contextBridge, ipcRenderer } = require('electron');
+// preload.js – bridge between renderer and main
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  // config
-  getCfg:  () => ipcRenderer.invoke('cfg:get'),
-  setCfg:  (patch) => ipcRenderer.invoke('cfg:set', patch),
+contextBridge.exposeInMainWorld("electronAPI", {
+  // ----- Config -----
+  getCfg: () => ipcRenderer.invoke("cfg:get"),
+  setCfg: (patch) => ipcRenderer.invoke("cfg:set", patch),
 
-  // layout
-  setGameRect: (rect) => ipcRenderer.invoke('game:set-rect', rect),
+  // ----- Layout / BrowserView rect -----
+  setGameRect: (rect) => ipcRenderer.invoke("game:set-rect", rect),
 
-  // capture
-  captureROIFromGame: () => ipcRenderer.invoke('game:capture-roi'),
-  getCursorInGame:   () => ipcRenderer.invoke('game:get-cursor-in-game'),
+  // ----- Captures -----
+  // (not actually used right now, but fine to keep)
+  captureFullFromGame: () => ipcRenderer.invoke("game:capture-full"),
 
-  // fine-tune overlay
-  openReshapeOverlay: () => ipcRenderer.invoke('roi:open-reshape'),
-  isReshapeOpen:      () => ipcRenderer.invoke('roi:reshape:is-open'),
-  forceApplyReshape:  () => ipcRenderer.invoke('roi:reshape:force-apply'),
-  forceCancelReshape: () => ipcRenderer.invoke('roi:reshape:force-cancel')
+  // ROI-only capture (used by diff loop + GPT OCR)
+  // renderer passes nothing, main falls back to cfg.roi
+  captureROIFromGame: (roi) => ipcRenderer.invoke("game:capture-roi", roi),
+
+  // 🔹 used by captureAtMouse()
+  getCursorInGame: () => ipcRenderer.invoke("game:get-cursor-in-game"),
+
+  // 🔹 used by fineTuneROI()
+  openReshapeOverlay: () => ipcRenderer.invoke("roi:open-reshape"),
+
+  // ----- GPT XP OCR -----
+  readXpWithGPT: (dataUrl) => ipcRenderer.invoke("gpt:read-xp", dataUrl),
 });
