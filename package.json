@@ -12,10 +12,10 @@
   },
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder -w nsis portable --x64 --publish never"
+    "dist": "electron-builder"
   },
-  "dependencies": {
-    "dotenv": "^16.6.1",
+    "dependencies": {
+    "dotenv": "^16.4.5",
     "openai": "^5.10.0"
   },
   "devDependencies": {
@@ -34,24 +34,17 @@
       "package.json"
     ],
     "asar": true,
-    "directories": {
-      "buildResources": "build"
-    },
+    "directories": { "buildResources": "build" },
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
+        { "target": "nsis", "arch": ["x64"] },
         "portable"
       ]
     },
     "nsis": {
       "oneClick": true,
       "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "artifactName": "Flyff Mob Tracker Setup ${version}.exe"
@@ -60,10 +53,7 @@
       "artifactName": "Flyff Mob Tracker Portable ${version}.exe"
     },
     "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": ["dmg","zip"],
       "category": "public.app-category.utilities",
       "hardenedRuntime": true
     },
