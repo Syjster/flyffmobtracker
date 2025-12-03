@@ -16,6 +16,42 @@ Grab the **Setup** or **Portable** EXE from the [Releases](https://github.com/Sy
    <img width="316" height="454" alt="Skärmbild 2025-11-05 231146" src="https://github.com/user-attachments/assets/5511ed37-d885-44ae-86e0-19ac28a4adec" />
 5. **Start** to track, Stop=Pause, Reset=resets the counter
 
+3. (Optional) Enable GPT XP OCR
+
+The tracker can use GPT-4o-mini to read exact XP % from the screen.
+This unlocks:
+
+Auto-calibration of XP per kill
+Accurate “Mobs to Level Up”
+Real XP values instead of pixel approximations
+To use this feature, add your own API key.
+
+🔑 Step A — Create a GPT API Key
+Go to: https://platform.openai.com/account/api-keys
+Click Create new secret key.
+Copy the key (starts with sk-...).
+
+📁 Step B — Add your key to the program folde
+In the same folder as the .exe, create a new file:
+gpt-config.json (Be sure it saves as .json and not .json.txt. Best is to go into notepad > Save As> All Files (Not .txt) and save it in the folder with the exe.)
+Paste the following:
+
+{
+  "OPENAI_API_KEY": "your-api-key-here"
+}
+
+Save the file and restart the tracker.
+
+Confirmation
+
+If the key is valid:
+GPT XP will appear under "GPT XP"
+Calibration and reading will work
+No more “API key missing” messages
+If you don’t want GPT OCR:
+Simply don’t create gpt-config.json
+The program works normally without it
+
 Tips:
 1. Manually calculate your xp/kill, insert number into "Total XP per Kill" to have it track "Total XP" & XP/h correcly.
 2. Finetune Pixel and Capture numbers. For fast killers make the time shorter.
