@@ -12,50 +12,9 @@
       <div class="sidebar-inner">
         <header class="sidebar-header">
           <h1>Flyff Mob Tracker</h1>
-
-          <!-- Capture + Fine-tune -->
-          <div class="button-row">
-            <button id="captureBtn" class="btn btn-main">Capture</button>
-            <button id="fineTuneBtn" class="btn btn-main-outline">Fine-tune</button>
-          </div>
-
-          <!-- Start / Stop / Reset (one per row) -->
-          <div class="button-column">
-            <button id="startBtn" class="btn btn-start">Start</button>
-            <button id="stopBtn" class="btn btn-stop">Stop</button>
-            <button id="resetBtn" class="btn btn-reset">Reset</button>
-          </div>
         </header>
 
-        <!-- Settings -->
-        <section class="section settings">
-          <div class="section-title">Settings</div>
-
-          <label class="field">
-            <span class="field-label">XP per kill (%)</span>
-            <input id="xpPerKill" type="text" class="field-input" value="0.0500" />
-          </label>
-
-          <label class="field">
-            <span class="field-label">Pixel diff to trigger (%)</span>
-            <input id="diffTrigger" type="text" class="field-input" value="6.5" />
-          </label>
-
-          <label class="field">
-            <span class="field-label">Cooldown (ms)</span>
-            <input id="diffCooldown" type="text" class="field-input" value="800" />
-          </label>
-
-          <label class="field">
-            <span class="field-label">GPT calibration kills</span>
-            <input id="calibKills" type="number" min="1" max="20" value="3" class="field-input small" />
-          </label>
-
-          <!-- GPT button on its own row -->
-          <button id="calibBtn" class="btn btn-gpt full-width-btn">GPT Auto XP</button>
-        </section>
-
-        <!-- Stats: one per row, big numbers -->
+        <!-- Stats FIRST (moved to top) -->
         <section class="section stats">
           <div class="section-title">Session</div>
 
@@ -80,13 +39,102 @@
           </div>
 
           <div class="stat-card">
-            <div class="stat-label">GPT XP</div>
-            <div id="gptXp" class="stat-value">--.--%</div>
-          </div>
-
-          <div class="stat-card">
             <div class="stat-label">Mobs to Level</div>
             <div id="mobsToLevel" class="stat-value">--</div>
+          </div>
+        </section>
+
+        <!-- Controls Section -->
+        <section class="section controls">
+          <div class="section-title">Controls</div>
+          
+          <!-- Play/Pause and Reset with icons -->
+          <div class="control-buttons">
+            <button id="playPauseBtn" class="btn btn-play" title="Start tracking">
+              <svg class="icon play-icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+              <svg class="icon pause-icon" viewBox="0 0 24 24" fill="currentColor" style="display:none">
+                <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+              </svg>
+            </button>
+            <button id="resetBtn" class="btn btn-reset" title="Reset session">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+              </svg>
+            </button>
+            <button id="newMobBtn" class="btn btn-new-mob" title="Switch to new mob type">
+              <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6-1.01 0-1.97-.25-2.8-.7l-1.46 1.46C8.97 19.54 10.43 20 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46C15.03 4.46 13.57 4 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z"/>
+              </svg>
+              <span>New Mob</span>
+            </button>
+          </div>
+          
+          <!-- Save Prems Button -->
+          <button id="savePremsBtn" class="btn btn-save-prems">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            </svg>
+            <span class="save-prems-text">Save Prems</span>
+          </button>
+        </section>
+
+        <!-- Session Log (moved above settings, taller) -->
+        <section class="section log-section">
+          <div class="section-title">Session Log</div>
+          <div id="sessionLog" class="session-log"></div>
+        </section>
+
+        <!-- Settings (collapsible, visible by default) -->
+        <section class="section settings">
+          <input type="checkbox" id="showSettingsChk" class="collapse-checkbox" checked />
+          <label for="showSettingsChk" class="section-title clickable">
+            <span class="collapse-arrow">▶</span> Settings
+          </label>
+
+          <div id="settingsContent" class="collapsible-content">
+            <label class="field">
+              <span class="field-label">XP per kill (%)</span>
+              <input id="xpPerKill" type="text" class="field-input" value="0.0500" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Pixel diff trigger (%)</span>
+              <input id="diffTrigger" type="text" class="field-input" value="6.5" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Cooldown (ms)</span>
+              <input id="diffCooldown" type="text" class="field-input" value="800" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Calibration kills</span>
+              <input id="calibKills" type="number" min="1" max="20" value="3" class="field-input small" />
+            </label>
+
+            <button id="calibBtn" class="btn btn-gpt full-width-btn">
+              <span class="calib-text">GPT Auto Calibrate</span>
+            </button>
+            
+            <p class="settings-hint">Collapse after calibration - settings are saved automatically.</p>
+          </div>
+        </section>
+
+        <!-- Capture Settings (collapsed by default) -->
+        <section class="section capture-section">
+          <input type="checkbox" id="showCaptureChk" class="collapse-checkbox" />
+          <label for="showCaptureChk" class="section-title clickable">
+            <span class="collapse-arrow">▶</span> Capture Settings
+          </label>
+          
+          <div id="captureContent" class="collapsible-content">
+            <p class="capture-hint">Only needed once - coordinates are saved automatically.</p>
+            <div class="button-row">
+              <button id="captureBtn" class="btn btn-main">Capture</button>
+              <button id="fineTuneBtn" class="btn btn-main-outline">Fine-tune</button>
+            </div>
           </div>
         </section>
 
@@ -94,46 +142,35 @@
         <section class="section debug-section">
           <label class="debug-toggle">
             <input type="checkbox" id="debugChk" />
-            <span>Show debug previews</span>
+            <span>Show debug info</span>
           </label>
 
-          <div class="debug-previews">
-            <canvas id="rawC"></canvas>
-            <canvas id="miniC"></canvas>
-            <canvas id="diffC"></canvas>
+          <div id="debugContent" style="display: none;">
+            <div class="debug-stat">
+              <span class="debug-stat-label">GPT XP Reading:</span>
+              <span id="gptXp" class="debug-stat-value">--.--%</span>
+            </div>
+
+            <div class="debug-previews">
+              <canvas id="rawC"></canvas>
+              <canvas id="miniC"></canvas>
+              <canvas id="diffC"></canvas>
+            </div>
           </div>
+
+          <!-- History button (always visible) -->
+          <button id="historyBtn" class="btn btn-history">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+            </svg>
+            <span>Session History</span>
+          </button>
         </section>
       </div>
     </aside>
 
-    <!-- Game area (BrowserView is positioned over this) -->
+    <!-- Game area -->
     <main id="gameContainer"></main>
-  </div>
-
-  <!-- ROI overlay for fine-tune -->
-  <div id="roiOverlay" class="roi-overlay hidden">
-    <div class="roi-dialog">
-      <div class="roi-header">
-        <div class="roi-title">Fine-Tune XP Bar Capture</div>
-        <div class="roi-subtitle">Drag the yellow box. Corners resize. Click Save when done.</div>
-      </div>
-
-      <div class="roi-canvas-wrap">
-        <canvas id="roiCanvas"></canvas>
-        <div id="roiBox" class="roi-box">
-          <!-- Drag handles (renderer.js uses classes "h" + corner name) -->
-          <div class="handle h tl"></div>
-          <div class="handle h tr"></div>
-          <div class="handle h bl"></div>
-          <div class="handle h br"></div>
-        </div>
-      </div>
-
-      <div class="roi-actions">
-        <button id="roiCancelBtn" class="btn btn-secondary">Cancel</button>
-        <button id="roiApplyBtn" class="btn btn-main">Save ROI</button>
-      </div>
-    </div>
   </div>
 
   <script src="renderer.js"></script>

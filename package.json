@@ -1,7 +1,7 @@
 {
   "name": "flyffmobtracker",
-  "version": "1.1.0",
-  "description": "Flyff Mob Tracker — an XP and mob counter for Flyff Universe.",
+  "version": "1.3.0",
+  "description": "Flyff Mob Tracker — an XP and mob counter for Flyff Universe with GPT-powered calibration.",
   "main": "main.js",
   "author": "Syjster",
   "license": "MIT",
@@ -14,9 +14,10 @@
     "start": "electron .",
     "dist": "electron-builder"
   },
-    "dependencies": {
+  "dependencies": {
     "dotenv": "^16.4.5",
-    "openai": "^5.10.0"
+    "openai": "^5.10.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "electron": "^32.0.0",
@@ -53,7 +54,7 @@
       "artifactName": "Flyff Mob Tracker Portable ${version}.exe"
     },
     "mac": {
-      "target": ["dmg","zip"],
+      "target": ["dmg", "zip"],
       "category": "public.app-category.utilities",
       "hardenedRuntime": true
     },

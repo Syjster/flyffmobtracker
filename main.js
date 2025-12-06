@@ -1,5 +1,5 @@
-// main.js — BrowserView + classic ROI: Set-at-mouse + mouse-only reshape overlay
-const { app, BrowserWindow, BrowserView, ipcMain, screen } = require('electron');
+// main.js — BrowserView + classic ROI: Set-at-mouse + mouse-only reshape overlay + Session Logging
+const { app, BrowserWindow, BrowserView, ipcMain, screen, shell } = require('electron');
 const path = require('path');
 const os   = require('os');
 const fs   = require('fs');
@@ -8,19 +8,17 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 // --- GPT key from env OR Documents/FlyffMobTracker/gpt-config.json ---
 const docDir = path.join(os.homedir(), 'Documents', 'FlyffMobTracker');
 const GPT_CFG_PATH = path.join(docDir, 'gpt-config.json');
+const SESSION_LOG_PATH = path.join(docDir, 'session_log.xlsx');
 let cachedGPTKey = null;
 
+// Ensure the Documents/FlyffMobTracker folder exists
+try {
+  fs.mkdirSync(docDir, { recursive: true });
+} catch {}
+
 function getOpenAIKey() {
-  // 1) Env var wins (e.g. from your .env file)
   if (process.env.OPENAI_API_KEY) return process.env.OPENAI_API_KEY;
-
-  // 2) Cached from file
   if (cachedGPTKey !== null) return cachedGPTKey;
-
-  // 3) Try reading config file once
-  try {
-    fs.mkdirSync(docDir, { recursive: true }); // ensure folder exists
-  } catch {}
 
   try {
     const txt = fs.readFileSync(GPT_CFG_PATH, 'utf8');
@@ -32,12 +30,135 @@ function getOpenAIKey() {
         return cachedGPTKey;
       }
     }
-  } catch {
-    // no file / bad JSON → ignore, GPT stays disabled
-  }
+  } catch {}
 
   return null;
 }
+
+// ---------- Excel Session Logging ----------
+let XLSX;
+try {
+  XLSX = require('xlsx');
+} catch (e) {
+  console.warn('xlsx module not found. Session logging to Excel will be disabled.');
+  console.warn('To enable, run: npm install xlsx');
+  XLSX = null;
+}
+
+function saveSessionToExcel(sessionData) {
+  if (!XLSX) {
+    console.warn('Cannot save session: xlsx module not available');
+    return false;
+  }
+
+  try {
+    let workbook;
+    let worksheet;
+    let existingData = [];
+
+    // Try to load existing workbook
+    if (fs.existsSync(SESSION_LOG_PATH)) {
+      try {
+        workbook = XLSX.readFile(SESSION_LOG_PATH);
+        worksheet = workbook.Sheets['Sessions'];
+        if (worksheet) {
+          existingData = XLSX.utils.sheet_to_json(worksheet);
+        }
+      } catch (e) {
+        console.warn('Could not read existing session log, creating new one:', e.message);
+        workbook = null;
+      }
+    }
+
+    // Create new workbook if needed
+    if (!workbook) {
+      workbook = XLSX.utils.book_new();
+    }
+
+    // Add new session data
+    const newRow = {
+      'Date': sessionData.date,
+      'Start Time': sessionData.startTime,
+      'End Time': sessionData.endTime,
+      'Duration': sessionData.duration,
+      'Total Kills': sessionData.kills,
+      'Total XP (%)': sessionData.xpSum,
+      'XP/Hour (%)': sessionData.xpPerHour,
+      'XP/Kill (%)': sessionData.xpPerKill,
+      'Level Ups': sessionData.levelUps,
+      'Notes': sessionData.notes || ''
+    };
+
+    existingData.push(newRow);
+
+    // Create new worksheet with all data
+    const newWorksheet = XLSX.utils.json_to_sheet(existingData);
+
+    // Set column widths
+    newWorksheet['!cols'] = [
+      { wch: 12 },  // Date
+      { wch: 10 },  // Start Time
+      { wch: 10 },  // End Time
+      { wch: 10 },  // Duration
+      { wch: 12 },  // Total Kills
+      { wch: 14 },  // Total XP
+      { wch: 12 },  // XP/Hour
+      { wch: 12 },  // XP/Kill
+      { wch: 10 },  // Level Ups
+      { wch: 40 },  // Notes (wider for XP details)
+    ];
+
+    // Remove old sheet if exists and add new one
+    if (workbook.Sheets['Sessions']) {
+      delete workbook.Sheets['Sessions'];
+      const idx = workbook.SheetNames.indexOf('Sessions');
+      if (idx > -1) workbook.SheetNames.splice(idx, 1);
+    }
+    XLSX.utils.book_append_sheet(workbook, newWorksheet, 'Sessions');
+
+    // Save workbook
+    XLSX.writeFile(workbook, SESSION_LOG_PATH);
+    console.log('Session saved to:', SESSION_LOG_PATH);
+    return true;
+  } catch (e) {
+    console.error('Failed to save session to Excel:', e);
+    return false;
+  }
+}
+
+// IPC handler for saving sessions
+ipcMain.handle('session:save', (_event, sessionData) => {
+  return saveSessionToExcel(sessionData);
+});
+
+// IPC handler to get the log file path
+ipcMain.handle('session:get-log-path', () => {
+  return SESSION_LOG_PATH;
+});
+
+// IPC handler to open the log folder in file explorer
+ipcMain.handle('session:open-folder', () => {
+  shell.openPath(docDir);
+  return true;
+});
+
+// IPC handler to reload the game (for Save Prems feature)
+ipcMain.handle('game:reload', () => {
+  if (gameView && gameView.webContents) {
+    gameView.webContents.loadURL('https://universe.flyff.com/play');
+    return true;
+  }
+  return false;
+});
+
+// IPC handler to close/stop the game view
+ipcMain.handle('game:stop', () => {
+  if (gameView && gameView.webContents) {
+    gameView.webContents.loadURL('about:blank');
+    return true;
+  }
+  return false;
+});
 
 // ---------- Writable cache (avoid Windows 0x5 issues) ----------
 const cacheBase = path.join(os.tmpdir(), 'flyffmobtracker-cache');
@@ -59,13 +180,13 @@ app.commandLine.appendSwitch('enable-zero-copy');
 const CFG_PATH = path.join(app.getPath('userData'), 'config.json');
 
 let cfg = {
-  roi: null, // {x,y,width,height} in BrowserView coordinates (CSS pixels)
+  roi: null,
   settings: {
     xpPerKill: 0.05,
     diffTrigger: 0.065,
     diffCooldown: 800,
-    side: 'left',          // 'left' | 'right'
-    sidebarWidth: 320      // slim default
+    side: 'left',
+    sidebarWidth: 320
   }
 };
 
@@ -91,7 +212,6 @@ let win;
 let gameView;
 let lastGameRect = { x: 0, y: 0, width: 800, height: 600 };
 
-// ROI overlay state
 let roiOverlay = null;
 let reshapeResolve = null;
 let overlayOpen = false;
@@ -113,7 +233,6 @@ function createWindow() {
   win.webContents.setIgnoreMenuShortcuts(true);
   win.loadFile('index.html');
 
-  // BrowserView for Flyff
   gameView = new BrowserView({
     webPreferences: {
       nodeIntegration: false,
@@ -125,14 +244,12 @@ function createWindow() {
 
   win.setBrowserView(gameView);
 
-  // Normal Chrome UA
   const ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 ' +
     '(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36';
   gameView.webContents.setUserAgent(ua);
 
   gameView.webContents.loadURL('https://universe.flyff.com/play');
-
   gameView.setBounds(lastGameRect);
 }
 
@@ -143,7 +260,7 @@ ipcMain.handle('cfg:set', (_e, patch) => {
   if (patch && typeof patch === 'object') {
     if (patch.settings && typeof patch.settings === 'object') {
       const s = patch.settings;
-      if (typeof s.xpPerKill   === 'number' && s.xpPerKill   >= 0)
+      if (typeof s.xpPerKill === 'number' && s.xpPerKill >= 0)
         cfg.settings.xpPerKill = s.xpPerKill;
 
       if (typeof s.diffTrigger === 'number' && s.diffTrigger > 0 && s.diffTrigger < 1)
@@ -172,7 +289,6 @@ ipcMain.handle('cfg:set', (_e, patch) => {
   return cfg;
 });
 
-// Renderer gives us the rect of the content area
 ipcMain.handle('game:set-rect', (_e, rect) => {
   if (!gameView || !rect) return false;
 
@@ -192,7 +308,6 @@ ipcMain.handle('game:set-rect', (_e, rect) => {
   }
 });
 
-// ROI capture from BrowserView
 ipcMain.handle('game:capture-roi', async () => {
   if (!gameView || !cfg.roi) return null;
   try {
@@ -204,12 +319,11 @@ ipcMain.handle('game:capture-roi', async () => {
   }
 });
 
-// Cursor position relative to game area
 ipcMain.handle('game:get-cursor-in-game', () => {
   if (!win) return null;
 
-  const mouse   = screen.getCursorScreenPoint();   // screen px
-  const content = win.getContentBounds();          // screen px
+  const mouse   = screen.getCursorScreenPoint();
+  const content = win.getContentBounds();
 
   const x = mouse.x - content.x - lastGameRect.x;
   const y = mouse.y - content.y - lastGameRect.y;
@@ -220,8 +334,7 @@ ipcMain.handle('game:get-cursor-in-game', () => {
   return { x: Math.round(x), y: Math.round(y) };
 });
 
-// ---------- ROI reshape overlay (mouse only, no keyboard steal) ----------
-
+// ---------- ROI reshape overlay ----------
 function finalizeReshape(rect) {
   if (roiOverlay) {
     try { roiOverlay.close(); } catch {}
@@ -259,7 +372,7 @@ ipcMain.handle('roi:open-reshape', () => {
     roiOverlay = null;
   }
 
-  const contentBounds = win.getContentBounds(); // screen coords
+  const contentBounds = win.getContentBounds();
   const overlayBounds = {
     x: contentBounds.x + Math.floor(lastGameRect.x),
     y: contentBounds.y + Math.floor(lastGameRect.y),
@@ -273,7 +386,7 @@ ipcMain.handle('roi:open-reshape', () => {
     transparent: true,
     resizable: false,
     movable: false,
-    focusable: false,      // <- important, keyboard stays in game / panel
+    focusable: false,
     alwaysOnTop: true,
     hasShadow: false,
     skipTaskbar: true,
@@ -407,7 +520,7 @@ ipcMain.handle('roi:open-reshape', () => {
   roiOverlay.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(html));
   roiOverlay.once('ready-to-show', () => {
     roiOverlay.setIgnoreMouseEvents(false);
-    roiOverlay.showInactive(); // don't steal focus
+    roiOverlay.showInactive();
   });
 
   roiOverlay.on('closed', () => {
@@ -436,12 +549,11 @@ ipcMain.handle('roi:reshape:force-apply', async () => {
 });
 
 ipcMain.handle('roi:reshape:force-cancel', async () => finalizeReshape(null));
+
 // ---------- GPT XP OCR ----------
-// Uses OPENAI_API_KEY from .env / environment.
-// Expects dataUrl = "data:image/png;base64,...." from captureROIFromGame.
 ipcMain.handle('gpt:read-xp', async (_event, dataUrl) => {
   try {
-    const apiKey = getOpenAIKey();          // ← use helper
+    const apiKey = getOpenAIKey();
     if (!apiKey) {
       console.error('OPENAI_API_KEY / gpt-config.json is not set.');
       return null;
@@ -452,7 +564,6 @@ ipcMain.handle('gpt:read-xp', async (_event, dataUrl) => {
       return null;
     }
 
-    // Strip prefix if present
     const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : dataUrl;
 
     const body = {
@@ -507,7 +618,6 @@ ipcMain.handle('gpt:read-xp', async (_event, dataUrl) => {
       return null;
     }
 
-    // Grab the first number-looking thing from the reply
     const match = text.match(/-?\d+(?:[\.,]\d+)?/);
     if (!match) {
       console.error('Could not parse number from GPT reply:', text);
