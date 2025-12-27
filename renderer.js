@@ -1,10 +1,13 @@
-// renderer.js – Flyff Mob Tracker v2
-// Features: Play/Pause toggle, New Mob button, cleaner logs, detailed sanity checks
+// renderer.js Ã¢â‚¬â€œ Flyff Mob Tracker v2 with AOE Mode & Tempo Stats
+// Features: 1v1 mode (pixel diff), AOE mode (GPT-only), Tempo stats, Time to level
 
 const A = window.electronAPI;
 
 // ---- Constants ----
 const SANITY_CHECK_MINUTES = 5;
+const DEFAULT_TEMPO_WINDOW = 50;  // Default rolling window size for tempo stats
+const MIN_TEMPO_WINDOW = 5;
+const MAX_TEMPO_WINDOW = 200;
 
 // ---- DOM ----
 const sidebar = document.getElementById("sidebar");
@@ -15,30 +18,67 @@ const resetBtn = document.getElementById("resetBtn");
 const newMobBtn = document.getElementById("newMobBtn");
 const savePremsBtn = document.getElementById("savePremsBtn");
 
+// Mode buttons
+const mode1v1Btn = document.getElementById("mode1v1Btn");
+const modeAoeBtn = document.getElementById("modeAoeBtn");
+const settings1v1 = document.getElementById("settings1v1");
+const settingsAoe = document.getElementById("settingsAoe");
+
 const captureBtn = document.getElementById("captureBtn");
 const fineTuneBtn = document.getElementById("fineTuneBtn");
 const showCaptureChk = document.getElementById("showCaptureChk");
 
+// 1v1 Settings
 const xpPerKillInput = document.getElementById("xpPerKill");
 const diffTriggerInput = document.getElementById("diffTrigger");
 const diffCooldownInput = document.getElementById("diffCooldown");
 const calibKillsInput = document.getElementById("calibKills");
 const calibBtn = document.getElementById("calibBtn");
 
+// AOE Settings
+const aoePollIntervalInput = document.getElementById("aoePollInterval");
+const aoeXpPerMobInput = document.getElementById("aoeXpPerMob");
+const aoeCalibBtn = document.getElementById("aoeCalibBtn");
+const aoeMobCountSection = document.getElementById("aoeMobCountSection");
+const aoeMobCountInput = document.getElementById("aoeMobCount");
+
+// Auto tracking settings
+const autoStartChk = document.getElementById("autoStartChk");
+const autoStopChk = document.getElementById("autoStopChk");
+const autoStopTimeoutInput = document.getElementById("autoStopTimeout");
+
+// Level tracking
+const charLevelInput = document.getElementById("charLevel");
+const lastSessionXpEl = document.getElementById("lastSessionXp");
+
+// Session Stats
 const elapsedEl = document.getElementById("elapsed");
 const killsEl = document.getElementById("kills");
 const xpEl = document.getElementById("xp");
 const xphrEl = document.getElementById("xphr");
 const gptXpEl = document.getElementById("gptXp");
 const mobsToLevelEl = document.getElementById("mobsToLevel");
+const timeToLevelEl = document.getElementById("timeToLevel");
+const estLevelTimeEl = document.getElementById("estLevelTime");
 const sessionLogEl = document.getElementById("sessionLog");
 
+// Tempo Stats
+const tempoXphrEl = document.getElementById("tempoXphr");
+const tempoMobshrEl = document.getElementById("tempoMobshr");
+const tempoXpPerKillEl = document.getElementById("tempoXpPerKill");
+const tempoAvgTimeEl = document.getElementById("tempoAvgTime");
+
+// Debug & GPT correction stats
 const debugChk = document.getElementById("debugChk");
 const debugContent = document.getElementById("debugContent");
+const gptCorrectionsEl = document.getElementById("gptCorrections");
+const correctionRateEl = document.getElementById("correctionRate");
+const calibrationWarning = document.getElementById("calibrationWarning");
 const rawC = document.getElementById("rawC");
 const miniC = document.getElementById("miniC");
 const diffC = document.getElementById("diffC");
 const historyBtn = document.getElementById("historyBtn");
+const backToLauncherBtn = document.getElementById("backToLauncherBtn");
 
 // ---- Helpers ----
 function num(v, def = 0) {
@@ -59,6 +99,12 @@ function fmtTime(date) {
   const m = date.getMinutes().toString().padStart(2, '0');
   const s = date.getSeconds().toString().padStart(2, '0');
   return `${h}:${m}:${s}`;
+}
+
+function fmtTimeShort(date) {
+  const h = date.getHours().toString().padStart(2, '0');
+  const m = date.getMinutes().toString().padStart(2, '0');
+  return `${h}:${m}`;
 }
 
 function fmtDate(date) {
@@ -83,9 +129,13 @@ function loadImage(url) {
   });
 }
 
-// ---- Session Log (only important events) ----
+// ---- Session Log ----
 function addLogEntry(message, type = 'info') {
   if (!sessionLogEl) return;
+  
+  // Skip individual kill messages to reduce spam
+  // Only show important events: corrections, errors, calibration, level ups
+  if (type === 'kill') return;
   
   const entry = document.createElement('div');
   entry.className = 'log-entry';
@@ -113,27 +163,51 @@ function addLogEntry(message, type = 'info') {
 }
 
 function clearLog() {
-  if (sessionLogEl) {
-    sessionLogEl.innerHTML = '';
-  }
+  if (sessionLogEl) sessionLogEl.innerHTML = '';
 }
 
 // ---- State ----
 let roi = null;
+let currentMode = '1v1';  // '1v1' or 'aoe'
+
+// 1v1 Mode settings
 let xpPerKill = 0.05;
 let diffTrigger = 0.065;
 let diffCooldown = 800;
 
+// AOE Mode settings
+let aoePollInterval = 25;  // seconds
+let aoeXpPerMob = 0.05;
+
+// Auto tracking settings
+let autoStartAfterCalib = true;
+let autoStopIdleEnabled = true;
+let autoStopIdleTimeout = 60;  // seconds
+let lastKillTime = null;
+let idleCheckId = null;
+
+// Tempo stats settings
+let tempoWindow = DEFAULT_TEMPO_WINDOW;  // Rolling window for tempo calculations
+
+// Session stats
 let kills = 0;
 let xpSum = 0;
 let running = false;
 
+// Pixel diff (1v1 mode)
 let prevMini = null;
 let lastChangeAt = 0;
 let loopId = null;
 let clockId = null;
 let sanityCheckInterval = null;
 
+// AOE Mode
+let aoeLoopId = null;
+let aoeCalibActive = false;
+let aoeCalibStartXp = null;
+let aoeCalibStartTime = null;
+
+// Timing
 let activeMsBase = 0;
 let sessionStartedAt = null;
 let sessionStartTime = null;
@@ -141,27 +215,37 @@ let sessionStartTime = null;
 const DIFF_W = 96;
 const DIFF_H = 22;
 
-// GPT calibration state
+// GPT calibration state (1v1)
 let calibActive = false;
 let calibStartKills = 0;
 let calibTargetKills = 0;
 let calibStartXp = null;
-let calibIsNewMob = false;  // true = New Mob (don't reset), false = initial calibration (reset after)
+let calibIsNewMob = false;
 
 // GPT reading state
 let lastXpFromGPT = null;
 let lastGptReadTime = null;
-let killsAtLastGPT = 0;  // Track kills at time of last GPT reading for accurate Mobs to Level
-let sessionStartXp = null;  // XP at start of session for logging
+let killsAtLastGPT = 0;
+let sessionStartXp = null;
 
 // Level tracking
 let levelUpCount = 0;
 let xpAtLevelStart = null;
+let characterLevel = 1;
+let lastSessionEndXp = null;  // For detecting level ups between sessions
 
-// Game state for Save Prems
+// GPT correction stats
+let gptCorrections = 0;  // Number of times GPT corrected kills this session
+let pixelKillCount = 0;  // Kills detected by pixel change
+
+// Tempo tracking (last N kills)
+let killTimestamps = [];  // Array of { time: Date, xp: number }
+let lastKillXp = null;
+
+// Game state
 let gameStopped = false;
 
-// ---- UI State ----
+// ---- UI State Updates ----
 function updatePlayPauseButton() {
   const playIcon = playPauseBtn.querySelector('.play-icon');
   const pauseIcon = playPauseBtn.querySelector('.pause-icon');
@@ -206,19 +290,108 @@ function updateCalibButton() {
   }
 }
 
+function updateAoeCalibButton() {
+  const textEl = aoeCalibBtn.querySelector('.aoe-calib-text');
+  if (aoeCalibActive) {
+    aoeCalibBtn.classList.add('is-calibrating');
+    textEl.textContent = 'Finish Calibration';
+    aoeMobCountSection.classList.remove('hidden');
+  } else {
+    aoeCalibBtn.classList.remove('is-calibrating');
+    textEl.textContent = 'Start AOE Calibration';
+    aoeMobCountSection.classList.add('hidden');
+  }
+}
+
+function updateModeUI() {
+  if (currentMode === '1v1') {
+    mode1v1Btn.classList.add('active');
+    modeAoeBtn.classList.remove('active');
+    settings1v1.style.display = 'block';
+    settingsAoe.style.display = 'none';
+    newMobBtn.style.display = 'flex';
+  } else {
+    mode1v1Btn.classList.remove('active');
+    modeAoeBtn.classList.add('active');
+    settings1v1.style.display = 'none';
+    settingsAoe.style.display = 'block';
+    newMobBtn.style.display = 'none';  // Not needed in AOE mode
+  }
+}
+
+function updateCorrectionStats() {
+  if (!gptCorrectionsEl || !correctionRateEl) return;
+  
+  gptCorrectionsEl.textContent = gptCorrections.toString();
+  
+  const totalChecks = pixelKillCount > 0 ? pixelKillCount : 1;
+  const rate = (gptCorrections / totalChecks) * 100;
+  correctionRateEl.textContent = rate.toFixed(1) + '%';
+  
+  // Show warning if correction rate is too high (>30%)
+  if (calibrationWarning) {
+    if (rate > 30 && pixelKillCount >= 10) {
+      calibrationWarning.classList.remove('hidden');
+    } else {
+      calibrationWarning.classList.add('hidden');
+    }
+  }
+}
+
 // ---- Init ----
 (async () => {
   const cfg = await A.getCfg();
   roi = cfg.roi || null;
 
+  // Get current character's tracking mode if available
+  const currentChar = await A.getCurrentChar();
+  if (currentChar && currentChar.trackingMode) {
+    currentMode = currentChar.trackingMode;
+  } else {
+    currentMode = cfg.settings?.trackingMode || '1v1';
+  }
+
   xpPerKill = num(cfg.settings?.xpPerKill ?? 0.05, 0.05);
   diffTrigger = num(cfg.settings?.diffTrigger ?? 0.065, 0.065);
   diffCooldown = Math.round(num(cfg.settings?.diffCooldown ?? 800, 800));
+  aoePollInterval = num(cfg.settings?.aoePollInterval ?? 25, 25);
+  aoeXpPerMob = num(cfg.settings?.aoeXpPerMob ?? 0.05, 0.05);
+  
+  // Auto tracking settings
+  autoStartAfterCalib = cfg.settings?.autoStartAfterCalib !== false;  // Default true
+  autoStopIdleEnabled = cfg.settings?.autoStopIdleEnabled !== false;  // Default true
+  autoStopIdleTimeout = Math.round(num(cfg.settings?.autoStopIdleTimeout ?? 60, 60));
+  
+  // Tempo stats settings
+  tempoWindow = Math.round(num(cfg.settings?.tempoWindow ?? DEFAULT_TEMPO_WINDOW, DEFAULT_TEMPO_WINDOW));
+  tempoWindow = Math.max(MIN_TEMPO_WINDOW, Math.min(MAX_TEMPO_WINDOW, tempoWindow));
+  
+  // Level tracking
+  characterLevel = Math.round(num(cfg.settings?.characterLevel ?? 1, 1));
+  lastSessionEndXp = cfg.settings?.lastSessionEndXp ?? null;
 
-  xpPerKillInput.value = xpPerKill.toFixed(4);
+  xpPerKillInput.value = xpPerKill.toFixed(5);
   diffTriggerInput.value = diffTrigger.toFixed(3);
   diffCooldownInput.value = String(diffCooldown);
+  aoePollIntervalInput.value = String(aoePollInterval);
+  aoeXpPerMobInput.value = aoeXpPerMob.toFixed(5);
+  
+  // Set level input
+  if (charLevelInput) charLevelInput.value = String(characterLevel);
+  if (lastSessionXpEl) {
+    lastSessionXpEl.textContent = lastSessionEndXp !== null ? lastSessionEndXp.toFixed(2) + '%' : '--';
+  }
+  
+  // Set checkbox states
+  if (autoStartChk) autoStartChk.checked = autoStartAfterCalib;
+  if (autoStopChk) autoStopChk.checked = autoStopIdleEnabled;
+  if (autoStopTimeoutInput) autoStopTimeoutInput.value = String(autoStopIdleTimeout);
+  
+  // Set tempo window input
+  const tempoWindowInput = document.getElementById('tempoWindowInput');
+  if (tempoWindowInput) tempoWindowInput.value = String(tempoWindow);
 
+  updateModeUI();
   setTimeout(fitGameToContent, 150);
 
   if (roi) {
@@ -228,35 +401,42 @@ function updateCalibButton() {
   }
   
   updatePlayPauseButton();
-  addLogEntry('Tracker ready', 'info');
+  
+  // Log with character name if available
+  if (currentChar) {
+    addLogEntry(`Tracker ready for ${currentChar.name} (${currentMode.toUpperCase()})`, 'info');
+  } else {
+    addLogEntry('Tracker ready', 'info');
+  }
+  
+  // Check for level up between sessions
+  checkForLevelUpBetweenSessions();
 })();
 
 // ---- Game BrowserView sizing ----
 function fitGameToContent() {
   const rect = gameContainer.getBoundingClientRect();
-  A.setGameRect({
+  const gameRect = {
     x: Math.round(rect.left),
     y: Math.round(rect.top),
     width: Math.round(rect.width),
     height: Math.round(rect.height)
-  });
+  };
+  console.log('[Renderer] fitGameToContent:', gameRect);
+  A.setGameRect(gameRect);
 }
 
 window.addEventListener("resize", fitGameToContent);
 
 // ---- Debug toggle ----
 function toggleDebug(on) {
-  if (debugContent) {
-    debugContent.style.display = on ? "block" : "none";
-  }
+  if (debugContent) debugContent.style.display = on ? "block" : "none";
   rawC.style.display = on ? "block" : "none";
   miniC.style.display = on ? "block" : "none";
   diffC.style.display = on ? "block" : "none";
 }
 
-debugChk.addEventListener("change", () => {
-  toggleDebug(debugChk.checked);
-});
+debugChk.addEventListener("change", () => toggleDebug(debugChk.checked));
 
 // ---- History Button ----
 historyBtn.addEventListener("click", async () => {
@@ -264,43 +444,42 @@ historyBtn.addEventListener("click", async () => {
   await A.openLogFolder();
 });
 
+// ---- Back to Launcher ----
+backToLauncherBtn?.addEventListener("click", async () => {
+  btnFlash(backToLauncherBtn);
+  if (kills > 0) await saveSessionToExcel();
+  await A.backToLauncher?.();
+});
+
 // ---- Save Prems Button ----
 savePremsBtn.addEventListener("click", async () => {
   btnFlash(savePremsBtn);
   
   if (gameStopped) {
-    // Resume - reload the game
     addLogEntry('Resuming session - reloading game...', 'info');
     await A.reloadGame();
     gameStopped = false;
     updateSavePremsButton();
   } else {
-    // Save prems - get XP reading before closing game
     if (roi && lastXpFromGPT !== null) {
       const endXp = await readXpWithGPT();
       if (endXp !== null) {
         lastXpFromGPT = endXp;
         killsAtLastGPT = kills;
-        gptXpEl.textContent = endXp.toFixed(4) + "%";
+        gptXpEl.textContent = endXp.toFixed(5) + "%";
       }
     }
     
-    // Pause tracking if running
     if (running) {
       running = false;
       if (sessionStartedAt != null) {
         activeMsBase += Date.now() - sessionStartedAt;
         sessionStartedAt = null;
       }
-      clearInterval(loopId);
-      loopId = null;
-      clearInterval(clockId);
-      clockId = null;
-      stopSanityCheck();
+      clearAllIntervals();
       updatePlayPauseButton();
     }
     
-    // Stop the game
     await A.stopGame();
     gameStopped = true;
     updateSavePremsButton();
@@ -309,11 +488,36 @@ savePremsBtn.addEventListener("click", async () => {
   }
 });
 
+// ---- Mode Toggle ----
+mode1v1Btn.addEventListener("click", async () => {
+  if (currentMode === '1v1') return;
+  if (running) {
+    alert('Please pause tracking before switching modes.');
+    return;
+  }
+  currentMode = '1v1';
+  updateModeUI();
+  await A.setCfg({ settings: { trackingMode: currentMode } });
+  addLogEntry('Switched to 1v1 Mode', 'info');
+});
+
+modeAoeBtn.addEventListener("click", async () => {
+  if (currentMode === 'aoe') return;
+  if (running) {
+    alert('Please pause tracking before switching modes.');
+    return;
+  }
+  currentMode = 'aoe';
+  updateModeUI();
+  await A.setCfg({ settings: { trackingMode: currentMode } });
+  addLogEntry('Switched to AOE Mode', 'info');
+});
+
 // ---- Inputs ----
 xpPerKillInput.addEventListener("change", async () => {
   const v = num(xpPerKillInput.value, xpPerKill);
   if (v >= 0) xpPerKill = v;
-  xpPerKillInput.value = xpPerKill.toFixed(4);
+  xpPerKillInput.value = xpPerKill.toFixed(5);
   await A.setCfg({ settings: { xpPerKill } });
   updateMobsToLevel();
 });
@@ -332,43 +536,212 @@ diffCooldownInput.addEventListener("change", async () => {
   await A.setCfg({ settings: { diffCooldown } });
 });
 
+aoePollIntervalInput.addEventListener("change", async () => {
+  const v = Math.round(num(aoePollIntervalInput.value, aoePollInterval));
+  if (v >= 10 && v <= 60) aoePollInterval = v;
+  aoePollIntervalInput.value = String(aoePollInterval);
+  await A.setCfg({ settings: { aoePollInterval } });
+});
+
+aoeXpPerMobInput.addEventListener("change", async () => {
+  const v = num(aoeXpPerMobInput.value, aoeXpPerMob);
+  if (v >= 0) aoeXpPerMob = v;
+  aoeXpPerMobInput.value = aoeXpPerMob.toFixed(5);
+  await A.setCfg({ settings: { aoeXpPerMob } });
+});
+
+// Auto tracking settings handlers
+if (autoStartChk) {
+  autoStartChk.addEventListener("change", async () => {
+    autoStartAfterCalib = autoStartChk.checked;
+    await A.setCfg({ settings: { autoStartAfterCalib } });
+  });
+}
+
+if (autoStopChk) {
+  autoStopChk.addEventListener("change", async () => {
+    autoStopIdleEnabled = autoStopChk.checked;
+    await A.setCfg({ settings: { autoStopIdleEnabled } });
+    
+    // Start/stop idle check based on current state
+    if (running && autoStopIdleEnabled && !idleCheckId) {
+      startIdleCheck();
+    } else if (!autoStopIdleEnabled && idleCheckId) {
+      clearInterval(idleCheckId);
+      idleCheckId = null;
+    }
+  });
+}
+
+if (autoStopTimeoutInput) {
+  autoStopTimeoutInput.addEventListener("change", async () => {
+    const v = parseInt(autoStopTimeoutInput.value, 10);
+    if (v >= 10 && v <= 600) {
+      autoStopIdleTimeout = v;
+      await A.setCfg({ settings: { autoStopIdleTimeout } });
+    }
+    autoStopTimeoutInput.value = String(autoStopIdleTimeout);
+  });
+}
+
+// Tempo window setting handler
+const tempoWindowInput = document.getElementById('tempoWindowInput');
+if (tempoWindowInput) {
+  tempoWindowInput.addEventListener("change", async () => {
+    const v = parseInt(tempoWindowInput.value, 10);
+    if (v >= MIN_TEMPO_WINDOW && v <= MAX_TEMPO_WINDOW) {
+      tempoWindow = v;
+      await A.setCfg({ settings: { tempoWindow } });
+      updateTempoStats();  // Recalculate with new window
+    }
+    tempoWindowInput.value = String(tempoWindow);
+  });
+}
+
 // ---- Stats refresh ----
 function refreshStats() {
   const now = Date.now();
-  const elapsed =
-    activeMsBase + (running && sessionStartedAt ? now - sessionStartedAt : 0);
+  const elapsed = activeMsBase + (running && sessionStartedAt ? now - sessionStartedAt : 0);
 
   elapsedEl.textContent = fmtDuration(elapsed);
 
   const hours = elapsed / 3600000 || 0;
+  const currentXpPerKill = currentMode === 'aoe' ? aoeXpPerMob : xpPerKill;
   const xpHr = hours > 0 ? xpSum / hours : 0;
 
-  xphrEl.textContent = xpHr.toFixed(4) + "%";
+  xphrEl.textContent = xpHr.toFixed(5) + "%";
   killsEl.textContent = String(kills);
-  xpEl.textContent = xpSum.toFixed(4) + "%";
+  xpEl.textContent = xpSum.toFixed(5) + "%";
+  
+  // Time to level calculations
+  updateTimeToLevel(xpHr);
+}
+
+// ---- Time to Level ----
+function updateTimeToLevel(xpHr) {
+  if (lastXpFromGPT === null || xpHr <= 0) {
+    timeToLevelEl.textContent = "--:--:--";
+    estLevelTimeEl.textContent = "--:--";
+    return;
+  }
+  
+  const currentXpPerKill = currentMode === 'aoe' ? aoeXpPerMob : xpPerKill;
+  const xpGainedSinceGPT = (kills - killsAtLastGPT) * currentXpPerKill;
+  const currentXp = lastXpFromGPT + xpGainedSinceGPT;
+  const remaining = Math.max(0, 100 - currentXp);
+  
+  // Time to level in hours
+  const hoursToLevel = remaining / xpHr;
+  const msToLevel = hoursToLevel * 3600000;
+  
+  timeToLevelEl.textContent = fmtDuration(msToLevel);
+  
+  // Estimated level up time
+  const estTime = new Date(Date.now() + msToLevel);
+  estLevelTimeEl.textContent = fmtTimeShort(estTime);
+}
+
+// ---- Tempo Stats (rolling window) ----
+function updateTempoStats() {
+  // Show stats starting from the first kill
+  if (killTimestamps.length < 1) {
+    tempoXphrEl.textContent = "--";
+    tempoMobshrEl.textContent = "--";
+    tempoXpPerKillEl.textContent = "--";
+    tempoAvgTimeEl.textContent = "--";
+    return;
+  }
+  
+  // For just 1 kill, calculate based on time since session started
+  if (killTimestamps.length === 1) {
+    const singleKill = killTimestamps[0];
+    const timeFromStart = sessionStartedAt ? (singleKill.time - sessionStartedAt) : 0;
+    
+    if (timeFromStart > 0) {
+      const hours = timeFromStart / 3600000;
+      const tempoXpHr = singleKill.xp / hours;
+      const tempoMobsHr = 1 / hours;
+      
+      tempoXphrEl.textContent = tempoXpHr.toFixed(2) + "%";
+      tempoMobshrEl.textContent = Math.round(tempoMobsHr).toString();
+      tempoXpPerKillEl.textContent = singleKill.xp.toFixed(5) + "%";
+      tempoAvgTimeEl.textContent = (timeFromStart / 1000).toFixed(1) + "s";
+    } else {
+      tempoXphrEl.textContent = "--";
+      tempoMobshrEl.textContent = "--";
+      tempoXpPerKillEl.textContent = singleKill.xp.toFixed(5) + "%";
+      tempoAvgTimeEl.textContent = "--";
+    }
+    return;
+  }
+  
+  // Get last N kills (up to tempoWindow setting)
+  const recentKills = killTimestamps.slice(-tempoWindow);
+  
+  // Calculate time span between first and last kill in window
+  const timeSpan = recentKills[recentKills.length - 1].time - recentKills[0].time;
+  const killCount = recentKills.length - 1;  // -1 because we're measuring between kills
+  
+  if (timeSpan <= 0 || killCount <= 0) {
+    // All kills happened at the same moment - use session start time
+    const firstKillTime = recentKills[0].time;
+    const timeFromStart = sessionStartedAt ? (firstKillTime - sessionStartedAt) : 1000;
+    const avgTimePerKill = timeFromStart / recentKills.length;
+    const xpGained = recentKills.reduce((sum, k) => sum + (k.xp || 0), 0);
+    const avgXpPerKill = xpGained / recentKills.length;
+    
+    if (avgTimePerKill > 0) {
+      const hours = avgTimePerKill / 3600000;
+      tempoXphrEl.textContent = (avgXpPerKill / hours).toFixed(2) + "%";
+      tempoMobshrEl.textContent = Math.round(1 / hours).toString();
+    } else {
+      tempoXphrEl.textContent = "--";
+      tempoMobshrEl.textContent = "--";
+    }
+    tempoXpPerKillEl.textContent = avgXpPerKill.toFixed(5) + "%";
+    tempoAvgTimeEl.textContent = (avgTimePerKill / 1000).toFixed(1) + "s";
+    return;
+  }
+  
+  // Calculate XP gained in this window (excluding first as baseline reference point)
+  const xpGained = recentKills.reduce((sum, k, i) => {
+    if (i === 0) return 0;
+    return sum + (k.xp || 0);
+  }, 0);
+  
+  const hours = timeSpan / 3600000;
+  const tempoXpHr = xpGained / hours;
+  const tempoMobsHr = killCount / hours;
+  const avgXpPerKill = xpGained / killCount;
+  const avgKillTime = timeSpan / killCount / 1000;  // seconds
+  
+  tempoXphrEl.textContent = tempoXpHr.toFixed(2) + "%";
+  tempoMobshrEl.textContent = Math.round(tempoMobsHr).toString();
+  tempoXpPerKillEl.textContent = avgXpPerKill.toFixed(5) + "%";
+  tempoAvgTimeEl.textContent = avgKillTime.toFixed(1) + "s";
 }
 
 // ---- Mobs to Level ----
-let levelUpCheckPending = false;  // Prevent multiple checks
+let levelUpCheckPending = false;
 
 function updateMobsToLevel() {
-  if (lastXpFromGPT == null || xpPerKill <= 0) {
+  const currentXpPerKill = currentMode === 'aoe' ? aoeXpPerMob : xpPerKill;
+  
+  if (lastXpFromGPT == null || currentXpPerKill <= 0) {
     mobsToLevelEl.textContent = "--";
     return;
   }
   
-  // Calculate current XP: last GPT reading + XP from kills since that reading
-  const xpGainedSinceGPT = (kills - killsAtLastGPT) * xpPerKill;
+  const xpGainedSinceGPT = (kills - killsAtLastGPT) * currentXpPerKill;
   const currentXp = lastXpFromGPT + xpGainedSinceGPT;
   
   const remaining = Math.max(0, 100 - currentXp);
-  const mobs = remaining / xpPerKill;
+  const mobs = remaining / currentXpPerKill;
   const mobsRounded = Number.isFinite(mobs) ? Math.round(mobs) : null;
   
   mobsToLevelEl.textContent = mobsRounded !== null ? String(mobsRounded) : "--";
   
-  // If mobs to level reaches 0 or below, trigger level up verification
-  if (mobsRounded !== null && mobsRounded <= 0 && running && !levelUpCheckPending && !calibActive) {
+  if (mobsRounded !== null && mobsRounded <= 0 && running && !levelUpCheckPending && !calibActive && !aoeCalibActive) {
     levelUpCheckPending = true;
     checkForLevelUp().finally(() => {
       levelUpCheckPending = false;
@@ -376,7 +749,7 @@ function updateMobsToLevel() {
   }
 }
 
-// ---- Level Up Check (triggered when mobs to level reaches 0) ----
+// ---- Level Up Check ----
 async function checkForLevelUp() {
   console.log('Mobs to level reached 0 - checking for level up...');
   
@@ -386,54 +759,65 @@ async function checkForLevelUp() {
     return;
   }
   
-  // Calculate what we expected vs what we got
-  const expectedXp = lastXpFromGPT + (kills - killsAtLastGPT) * xpPerKill;
+  const currentXpPerKill = currentMode === 'aoe' ? aoeXpPerMob : xpPerKill;
+  const expectedXp = lastXpFromGPT + (kills - killsAtLastGPT) * currentXpPerKill;
   
-  // If current XP is much lower than expected (dropped by 50%+), we leveled up
   if (currentGptXp < 50 && expectedXp > 90) {
-    // Confirmed level up!
     levelUpCount++;
+    incrementLevelDuringSession();
+    addLogEntry(`ðŸŽ‰ LEVEL UP #${levelUpCount}! XP reset to ${currentGptXp.toFixed(5)}%`, 'level-up');
     
-    addLogEntry(`🎉 LEVEL UP #${levelUpCount}! XP reset to ${currentGptXp.toFixed(4)}%`, 'level-up');
-    
-    // Update GPT readings
     lastXpFromGPT = currentGptXp;
     lastGptReadTime = Date.now();
     killsAtLastGPT = kills;
-    gptXpEl.textContent = currentGptXp.toFixed(4) + "%";
+    gptXpEl.textContent = currentGptXp.toFixed(5) + "%";
     
-    // Start auto-recalibration (like New Mob but for level up)
-    const n = Math.max(1, Math.min(20, parseInt(calibKillsInput.value || "3", 10)));
-    calibActive = true;
-    calibIsNewMob = true;  // Keep stats, just recalibrate
-    calibStartKills = kills;
-    calibTargetKills = kills + n;
-    calibStartXp = currentGptXp;
-    xpAtLevelStart = currentGptXp;
+    // Auto recalibrate
+    if (currentMode === '1v1') {
+      const n = Math.max(1, Math.min(20, parseInt(calibKillsInput.value || "3", 10)));
+      calibActive = true;
+      calibIsNewMob = true;
+      calibStartKills = kills;
+      calibTargetKills = kills + n;
+      calibStartXp = currentGptXp;
+      xpAtLevelStart = currentGptXp;
+      updateCalibButton();
+      addLogEntry(`Auto-recalibrating (${n} kills)...`, 'info');
+    }
     
     updateMobsToLevel();
-    updateCalibButton();
-    
-    addLogEntry(`Auto-recalibrating (${n} kills)...`, 'info');
   } else {
-    // Not a level up - just update readings
     lastXpFromGPT = currentGptXp;
     lastGptReadTime = Date.now();
     killsAtLastGPT = kills;
-    gptXpEl.textContent = currentGptXp.toFixed(4) + "%";
+    gptXpEl.textContent = currentGptXp.toFixed(5) + "%";
     updateMobsToLevel();
-    
-    console.log('Not a level up - XP sanity check passed');
   }
 }
 
-// ---- Kill registration (no log spam) ----
-function registerKill() {
+// ---- Kill registration ----
+function registerKill(xpGained = null) {
+  const currentXpPerKill = currentMode === 'aoe' ? aoeXpPerMob : xpPerKill;
+  const xp = xpGained !== null ? xpGained : currentXpPerKill;
+  
   kills += 1;
-  xpSum += xpPerKill;
+  xpSum += xp;
+  recordKillTime();  // For idle check
+
+  // Record for tempo tracking
+  killTimestamps.push({
+    time: Date.now(),
+    xp: xp
+  });
+  
+  // Keep only last 100 kills in memory
+  if (killTimestamps.length > 100) {
+    killTimestamps = killTimestamps.slice(-100);
+  }
 
   refreshStats();
   updateMobsToLevel();
+  updateTempoStats();
 
   if (calibActive) {
     updateCalibButton();
@@ -441,6 +825,33 @@ function registerKill() {
       finishCalibrationWithGPT().catch(console.error);
     }
   }
+}
+
+// Register multiple kills at once (AOE mode)
+function registerMultipleKills(count, totalXp) {
+  const xpPerMob = count > 0 ? totalXp / count : aoeXpPerMob;
+  
+  for (let i = 0; i < count; i++) {
+    kills += 1;
+    xpSum += xpPerMob;
+    
+    killTimestamps.push({
+      time: Date.now() - (count - i - 1) * 100,  // Spread timestamps slightly
+      xp: xpPerMob
+    });
+  }
+  
+  recordKillTime();  // For idle check
+  
+  if (killTimestamps.length > 100) {
+    killTimestamps = killTimestamps.slice(-100);
+  }
+
+  refreshStats();
+  updateMobsToLevel();
+  updateTempoStats();
+  
+  addLogEntry(`Kill #${kills} (+${count} mobs, +${totalXp.toFixed(5)}%)`, 'kill');
 }
 
 // ---- Auto-save session to Excel ----
@@ -452,21 +863,24 @@ async function saveSessionToExcel() {
   const hours = elapsed / 3600000 || 0;
   const xpHr = hours > 0 ? xpSum / hours : 0;
   
-  // Calculate end XP (current GPT reading or estimate)
+  const currentXpPerKill = currentMode === 'aoe' ? aoeXpPerMob : xpPerKill;
   const endXp = lastXpFromGPT !== null ? lastXpFromGPT : null;
   
-  // Build notes with XP details
-  let notes = '';
+  // Get current character name
+  const currentChar = await A.getCurrentChar();
+  const charName = currentChar?.name || 'Unknown';
+  
+  let notes = `Mode: ${currentMode.toUpperCase()}`;
   if (sessionStartXp !== null && endXp !== null) {
-    // Calculate actual XP gain including level ups
-    const rawGain = endXp - sessionStartXp;
-    const totalGain = rawGain + (levelUpCount * 100);
-    notes = `Start: ${sessionStartXp.toFixed(2)}% → End: ${endXp.toFixed(2)}%`;
+    notes += ` | Start: ${sessionStartXp.toFixed(2)}% -> End: ${endXp.toFixed(2)}%`;
     if (levelUpCount > 0) {
       notes += ` (+${levelUpCount} lvl)`;
     }
-  } else if (endXp !== null) {
-    notes = `End: ${endXp.toFixed(2)}%`;
+  }
+  
+  // Add GPT correction info
+  if (gptCorrections > 0) {
+    notes += ` | GPT corrections: ${gptCorrections}`;
   }
 
   const sessionData = {
@@ -475,17 +889,27 @@ async function saveSessionToExcel() {
     endTime: fmtTime(now),
     duration: fmtDuration(elapsed),
     kills: kills,
-    xpSum: xpSum.toFixed(4),
-    xpPerHour: xpHr.toFixed(4),
-    xpPerKill: xpPerKill.toFixed(4),
+    xpSum: xpSum.toFixed(5),
+    xpPerHour: xpHr.toFixed(5),
+    xpPerKill: currentXpPerKill.toFixed(5),
     levelUps: levelUpCount,
-    notes: notes
+    notes: notes,
+    characterName: charName,
+    level: characterLevel
   };
 
   try {
     const success = await A.saveSession(sessionData);
     if (success) {
       addLogEntry('Session saved to Excel', 'success');
+      
+      // Save last session end XP for detecting level ups between sessions
+      if (endXp !== null) {
+        lastSessionEndXp = endXp;
+        if (lastSessionXpEl) lastSessionXpEl.textContent = endXp.toFixed(2) + '%';
+        await A.setCfg({ settings: { lastSessionEndXp: endXp } });
+      }
+      
       return true;
     }
   } catch (e) {
@@ -494,7 +918,105 @@ async function saveSessionToExcel() {
   return false;
 }
 
-// ---- Sanity Check (detailed logging) ----
+// ---- Clear all intervals helper ----
+function clearAllIntervals() {
+  if (loopId) { clearInterval(loopId); loopId = null; }
+  if (clockId) { clearInterval(clockId); clockId = null; }
+  if (aoeLoopId) { clearInterval(aoeLoopId); aoeLoopId = null; }
+  if (sanityCheckInterval) { clearInterval(sanityCheckInterval); sanityCheckInterval = null; }
+  if (idleCheckId) { clearInterval(idleCheckId); idleCheckId = null; }
+}
+
+// ---- Start/Stop Tracking (can be called programmatically) ----
+function startTracking() {
+  if (running) return;
+  if (!roi) {
+    addLogEntry('Cannot start: ROI not set', 'error');
+    return;
+  }
+  
+  running = true;
+  lastKillTime = Date.now();  // Reset idle timer
+  
+  if (sessionStartTime == null) {
+    sessionStartTime = new Date();
+  }
+  
+  if (sessionStartedAt == null) sessionStartedAt = Date.now();
+
+  if (currentMode === '1v1') {
+    if (!loopId) loopId = setInterval(runDiff, 180);
+    if (!clockId) clockId = setInterval(refreshStats, 250);
+    startSanityCheck();
+  } else {
+    // AOE mode
+    if (!clockId) clockId = setInterval(refreshStats, 250);
+    startAoeLoop();
+  }
+  
+  // Start idle check if enabled
+  if (autoStopIdleEnabled && !idleCheckId) {
+    startIdleCheck();
+  }
+  
+  updatePlayPauseButton();
+}
+
+async function stopTracking(reason = 'Paused') {
+  if (!running) return;
+  
+  running = false;
+  
+  if (sessionStartedAt != null) {
+    activeMsBase += Date.now() - sessionStartedAt;
+    sessionStartedAt = null;
+  }
+  
+  clearAllIntervals();
+  updatePlayPauseButton();
+  
+  // Get final XP reading
+  if (roi && lastXpFromGPT !== null) {
+    const endXp = await readXpWithGPT();
+    if (endXp !== null) {
+      lastXpFromGPT = endXp;
+      killsAtLastGPT = kills;
+      gptXpEl.textContent = endXp.toFixed(5) + "%";
+    }
+  }
+  
+  addLogEntry(`Tracking stopped: ${reason}`, 'info');
+  
+  // Auto-save on stop
+  if (kills > 0) {
+    await saveSessionToExcel();
+  }
+}
+
+// ---- Idle Check (auto-stop if no kills) ----
+function startIdleCheck() {
+  if (idleCheckId) clearInterval(idleCheckId);
+  
+  idleCheckId = setInterval(() => {
+    if (!running || !autoStopIdleEnabled) return;
+    
+    const now = Date.now();
+    const idleMs = now - (lastKillTime || now);
+    const idleThresholdMs = autoStopIdleTimeout * 1000;
+    
+    if (idleMs >= idleThresholdMs) {
+      const idleSec = Math.round(idleMs / 1000);
+      stopTracking(`No kills for ${idleSec}s (auto-stop)`);
+    }
+  }, 5000);  // Check every 5 seconds
+}
+
+// ---- Record kill time for idle tracking ----
+function recordKillTime() {
+  lastKillTime = Date.now();
+}
+
+// ---- Sanity Check (1v1 mode) ----
 function startSanityCheck() {
   if (sanityCheckInterval) clearInterval(sanityCheckInterval);
   
@@ -510,23 +1032,22 @@ function startSanityCheck() {
     
     lastXpFromGPT = currentGptXp;
     lastGptReadTime = Date.now();
-    killsAtLastGPT = kills;  // Track kills at this GPT reading
-    gptXpEl.textContent = currentGptXp.toFixed(4) + "%";
+    killsAtLastGPT = kills;
+    gptXpEl.textContent = currentGptXp.toFixed(5) + "%";
     
-    // Check for level-up (sanity check backup - primary detection is via Mobs to Level)
+    // Check for level-up
     const previousExpected = xpAtLevelStart !== null 
       ? xpAtLevelStart + (kills - calibStartKills) * xpPerKill 
       : null;
     
     if (previousExpected !== null && previousExpected > 90 && currentGptXp < 30 && !calibActive) {
       levelUpCount++;
+    incrementLevelDuringSession();
+      addLogEntry(`ðŸŽ‰ LEVEL UP #${levelUpCount}! XP reset to ${currentGptXp.toFixed(5)}%`, 'level-up');
       
-      addLogEntry(`🎉 LEVEL UP #${levelUpCount}! XP reset to ${currentGptXp.toFixed(4)}%`, 'level-up');
-      
-      // Start auto-recalibration
       const n = Math.max(1, Math.min(20, parseInt(calibKillsInput.value || "3", 10)));
       calibActive = true;
-      calibIsNewMob = true;  // Keep stats
+      calibIsNewMob = true;
       calibStartKills = kills;
       calibTargetKills = kills + n;
       calibStartXp = currentGptXp;
@@ -534,12 +1055,11 @@ function startSanityCheck() {
       
       updateMobsToLevel();
       updateCalibButton();
-      
       addLogEntry(`Auto-recalibrating (${n} kills)...`, 'info');
       return;
     }
     
-    // Detailed sanity check
+    // Sanity check
     if (xpAtLevelStart !== null) {
       const killsSinceRef = kills - calibStartKills;
       const expectedXp = xpAtLevelStart + killsSinceRef * xpPerKill;
@@ -548,48 +1068,108 @@ function startSanityCheck() {
       const xpDiff = Math.abs(currentGptXp - expectedXp);
       const killDiff = Math.abs(killsSinceRef - expectedKillsFromXp);
       
-      // Build detailed log message
-      let logMsg = `GPT: ${currentGptXp.toFixed(4)}% | Start: ${xpAtLevelStart.toFixed(4)}% | Gain: ${totalGain.toFixed(4)}%\n`;
-      logMsg += `${totalGain.toFixed(4)}% ÷ ${xpPerKill.toFixed(4)}% = ${expectedKillsFromXp.toFixed(1)} kills\n`;
-      logMsg += `Tracked: ${killsSinceRef} kills`;
+      let logMsg = `GPT: ${currentGptXp.toFixed(5)}% | Gain: ${totalGain.toFixed(5)}%`;
       
       if (xpDiff > (xpPerKill * 3) && xpDiff < 50 && killDiff >= 2) {
         const correctedKills = calibStartKills + Math.round(expectedKillsFromXp);
-        const oldKills = kills;
         const correction = correctedKills - kills;
         
         if (correctedKills > 0 && Math.abs(correction) < 50) {
           xpSum += correction * xpPerKill;
           kills = correctedKills;
           refreshStats();
-          
-          logMsg += ` | Diff: ${correction > 0 ? '+' : ''}${correction}\n`;
-          logMsg += `⚠️ Corrected: ${oldKills} → ${correctedKills}`;
+          logMsg += ` | Corrected: ${correction > 0 ? '+' : ''}${correction}`;
+          // Track GPT correction
+          gptCorrections++;
+          updateCorrectionStats();
           addLogEntry(logMsg, 'warning');
         } else {
-          logMsg += ` | OK ✓`;
-          addLogEntry(logMsg, 'sanity');
+          addLogEntry(logMsg + ' | OK', 'sanity');
         }
       } else {
-        logMsg += ` | OK ✓`;
-        addLogEntry(logMsg, 'sanity');
+        addLogEntry(logMsg + ' | OK', 'sanity');
       }
-    } else {
-      addLogEntry(`GPT: ${currentGptXp.toFixed(4)}% (no baseline yet)`, 'sanity');
     }
     
     updateMobsToLevel();
   }, SANITY_CHECK_MINUTES * 60 * 1000);
 }
 
-function stopSanityCheck() {
-  if (sanityCheckInterval) {
-    clearInterval(sanityCheckInterval);
-    sanityCheckInterval = null;
-  }
+// ---- AOE Mode Loop ----
+let lastAoeXp = null;
+
+function startAoeLoop() {
+  if (aoeLoopId) clearInterval(aoeLoopId);
+  
+  // Initial GPT read
+  readXpWithGPT().then(xp => {
+    if (xp !== null) {
+      lastAoeXp = xp;
+      lastXpFromGPT = xp;
+      killsAtLastGPT = kills;
+      gptXpEl.textContent = xp.toFixed(5) + "%";
+      addLogEntry(`AOE started at ${xp.toFixed(5)}%`, 'info');
+    }
+  });
+  
+  aoeLoopId = setInterval(async () => {
+    if (!running) return;
+    
+    const currentXp = await readXpWithGPT();
+    if (currentXp === null) {
+      addLogEntry('AOE poll failed: GPT read error', 'error');
+      return;
+    }
+    
+    gptXpEl.textContent = currentXp.toFixed(5) + "%";
+    
+    // Check for level up
+    if (lastAoeXp !== null && lastAoeXp > 90 && currentXp < 30) {
+      levelUpCount++;
+    incrementLevelDuringSession();
+      addLogEntry(`ðŸŽ‰ LEVEL UP #${levelUpCount}! XP reset to ${currentXp.toFixed(5)}%`, 'level-up');
+      lastAoeXp = currentXp;
+      lastXpFromGPT = currentXp;
+      killsAtLastGPT = kills;
+      updateMobsToLevel();
+      return;
+    }
+    
+    // Calculate XP gained
+    if (lastAoeXp !== null) {
+      let xpGained = currentXp - lastAoeXp;
+      
+      // Handle level up wrap
+      if (xpGained < 0) {
+        xpGained += 100;
+      }
+      
+      if (xpGained > 0.001) {  // Threshold to avoid noise
+        const mobsKilled = Math.round(xpGained / aoeXpPerMob);
+        
+        if (mobsKilled > 0) {
+          registerMultipleKills(mobsKilled, xpGained);
+          
+          // Update XP per mob estimate if in calibration
+          if (aoeCalibActive && aoeCalibStartXp !== null) {
+            const totalXpSinceCalib = currentXp - aoeCalibStartXp;
+            if (totalXpSinceCalib > 0 && kills > 0) {
+              // Will update on finish
+            }
+          }
+        }
+      }
+    }
+    
+    lastAoeXp = currentXp;
+    lastXpFromGPT = currentXp;
+    killsAtLastGPT = kills;
+    updateMobsToLevel();
+    
+  }, aoePollInterval * 1000);
 }
 
-// ---- Capture + diff ----
+// ---- Capture + diff (1v1 mode) ----
 async function previewOnce() {
   if (!roi) return;
   const dataURL = await A.captureROIFromGame();
@@ -652,6 +1232,12 @@ async function runDiff() {
     if (norm > diffTrigger && now - lastChangeAt > diffCooldown) {
       lastChangeAt = now;
       registerKill();
+      pixelKillCount++;  // Track pixel-detected kills
+      
+      // Log kill with XP info
+      const xpGainedSinceGPT = (kills - killsAtLastGPT) * xpPerKill;
+      const estXp = lastXpFromGPT !== null ? (lastXpFromGPT + xpGainedSinceGPT).toFixed(5) : '??';
+      addLogEntry(`Kill #${kills} (+${xpPerKill.toFixed(5)}%)`, 'kill');
     }
 
     if (debugChk.checked) {
@@ -716,57 +1302,17 @@ playPauseBtn.addEventListener("click", async () => {
   
   if (running) {
     // PAUSE
-    running = false;
-    
-    if (sessionStartedAt != null) {
-      activeMsBase += Date.now() - sessionStartedAt;
-      sessionStartedAt = null;
-    }
-    
-    clearInterval(loopId);
-    loopId = null;
-    clearInterval(clockId);
-    clockId = null;
-    stopSanityCheck();
-    
-    updatePlayPauseButton();
-    
-    // Get current XP via GPT for Excel logging
-    let endXp = null;
-    if (roi && lastXpFromGPT !== null) {
-      endXp = await readXpWithGPT();
-      if (endXp !== null) {
-        lastXpFromGPT = endXp;
-        killsAtLastGPT = kills;
-        gptXpEl.textContent = endXp.toFixed(4) + "%";
-      }
-    }
-    
-    // Auto-save on pause if we have data
-    if (kills > 0) {
-      await saveSessionToExcel();
-    }
+    await stopTracking('Paused by user');
   } else {
     // PLAY
     if (!roi) {
-      alert("Please capture the XP bar first.\nClick '▶ Capture Settings' below to expand.");
+      alert("Please capture the XP bar first.\nClick 'Ã¢â€“Â¶ Capture Settings' below to expand.");
       showCaptureChk.checked = true;
       return;
     }
     
-    running = true;
-    
-    if (sessionStartTime == null) {
-      sessionStartTime = new Date();
-    }
-    
-    if (sessionStartedAt == null) sessionStartedAt = Date.now();
-
-    if (!loopId) loopId = setInterval(runDiff, 180);
-    if (!clockId) clockId = setInterval(refreshStats, 250);
-    
-    startSanityCheck();
-    updatePlayPauseButton();
+    startTracking();
+    addLogEntry('Tracking started', 'info');
   }
 });
 
@@ -774,7 +1320,6 @@ playPauseBtn.addEventListener("click", async () => {
 resetBtn.addEventListener("click", async () => {
   btnFlash(resetBtn);
   
-  // Save before reset if we have data
   if (kills > 0) {
     await saveSessionToExcel();
   }
@@ -797,23 +1342,33 @@ resetBtn.addEventListener("click", async () => {
   sessionStartXp = null;
   xpAtLevelStart = null;
   levelUpCount = 0;
+  lastAoeXp = null;
+  aoeCalibActive = false;
+  aoeCalibStartXp = null;
+  killTimestamps = [];
   
-  clearInterval(loopId);
-  loopId = null;
-  clearInterval(clockId);
-  clockId = null;
-  stopSanityCheck();
+  // Reset GPT correction stats
+  gptCorrections = 0;
+  pixelKillCount = 0;
+  updateCorrectionStats();
+  
+  clearAllIntervals();
   
   refreshStats();
+  updateTempoStats();
   gptXpEl.textContent = "--.--%";
   mobsToLevelEl.textContent = "--";
+  timeToLevelEl.textContent = "--:--:--";
+  estLevelTimeEl.textContent = "--:--";
   
   updatePlayPauseButton();
+  updateCalibButton();
+  updateAoeCalibButton();
   clearLog();
   addLogEntry('Session reset', 'info');
 });
 
-// ---- New Mob Button ----
+// ---- New Mob Button (1v1 mode) ----
 newMobBtn.addEventListener("click", async () => {
   btnFlash(newMobBtn);
   
@@ -822,9 +1377,8 @@ newMobBtn.addEventListener("click", async () => {
     return;
   }
   
-  // If already calibrating, just inform user
   if (calibActive) {
-    alert("Already calibrating! Finish current calibration first or wait for it to complete.");
+    alert("Already calibrating! Finish current calibration first.");
     return;
   }
   
@@ -836,17 +1390,15 @@ newMobBtn.addEventListener("click", async () => {
     return;
   }
   
-  // Update GPT reading (don't reset any stats!)
   lastXpFromGPT = currentXp;
   lastGptReadTime = Date.now();
-  killsAtLastGPT = kills;  // Track kills at this GPT reading
-  gptXpEl.textContent = currentXp.toFixed(4) + "%";
+  killsAtLastGPT = kills;
+  gptXpEl.textContent = currentXp.toFixed(5) + "%";
   
-  // Start calibration for new mob - track from current kill count
   const n = Math.max(1, Math.min(20, parseInt(calibKillsInput.value || "3", 10)));
   calibActive = true;
-  calibIsNewMob = true;  // This is new mob - don't reset stats after
-  calibStartKills = kills;  // Start from current kills
+  calibIsNewMob = true;
+  calibStartKills = kills;
   calibTargetKills = kills + n;
   calibStartXp = currentXp;
   xpAtLevelStart = currentXp;
@@ -854,15 +1406,10 @@ newMobBtn.addEventListener("click", async () => {
   updateMobsToLevel();
   updateCalibButton();
   
-  // Auto-start tracking if not already running
   if (!running) {
     running = true;
-    if (sessionStartTime == null) {
-      sessionStartTime = new Date();
-    }
-    if (sessionStartedAt == null) {
-      sessionStartedAt = Date.now();
-    }
+    if (sessionStartTime == null) sessionStartTime = new Date();
+    if (sessionStartedAt == null) sessionStartedAt = Date.now();
     
     if (!loopId) loopId = setInterval(runDiff, 180);
     if (!clockId) clockId = setInterval(refreshStats, 250);
@@ -871,7 +1418,7 @@ newMobBtn.addEventListener("click", async () => {
     updatePlayPauseButton();
   }
   
-  addLogEntry(`New mob! XP: ${currentXp.toFixed(4)}% - Kill ${n} to calibrate`, 'success');
+  addLogEntry(`New mob! XP: ${currentXp.toFixed(5)}% - Kill ${n} to calibrate`, 'success');
 });
 
 // ---- ROI capture / fine-tune ----
@@ -891,7 +1438,7 @@ async function captureAtMouse() {
 
   try {
     for (let i = 3; i > 0; i--) {
-      captureBtn.textContent = `Capturing in ${i}…`;
+      captureBtn.textContent = `Capturing in ${i}Ã¢â‚¬Â¦`;
       await new Promise(r => setTimeout(r, 1000));
     }
 
@@ -933,11 +1480,10 @@ async function fineTuneROI() {
   }
 }
 
-// ---- GPT Calibration ----
+// ---- GPT Calibration (1v1 Mode) ----
 calibBtn.addEventListener("click", async () => {
   btnFlash(calibBtn);
   
-  // If already calibrating, finish early
   if (calibActive) {
     await finishCalibrationWithGPT();
     return;
@@ -968,25 +1514,25 @@ calibBtn.addEventListener("click", async () => {
   prevMini = null;
   lastChangeAt = 0;
   levelUpCount = 0;
+  killTimestamps = [];
   
-  // Set up calibration
   lastXpFromGPT = xpStart;
   lastGptReadTime = Date.now();
-  killsAtLastGPT = 0;  // Reset since kills are also reset
-  gptXpEl.textContent = xpStart.toFixed(4) + "%";
+  killsAtLastGPT = 0;
+  gptXpEl.textContent = xpStart.toFixed(5) + "%";
   
   calibActive = true;
-  calibIsNewMob = false;  // This is initial calibration - will reset after
+  calibIsNewMob = false;
   calibStartKills = 0;
   calibTargetKills = n;
   calibStartXp = xpStart;
   xpAtLevelStart = xpStart;
   
   refreshStats();
+  updateTempoStats();
   updateMobsToLevel();
   updateCalibButton();
   
-  // Auto-start tracking
   if (!running) {
     running = true;
     sessionStartTime = new Date();
@@ -998,7 +1544,7 @@ calibBtn.addEventListener("click", async () => {
     updatePlayPauseButton();
   }
   
-  addLogEntry(`Calibrating at ${xpStart.toFixed(4)}% - kill ${n} mobs`, 'info');
+  addLogEntry(`Calibrating at ${xpStart.toFixed(5)}% - kill ${n} mobs`, 'info');
 });
 
 async function finishCalibrationWithGPT() {
@@ -1012,8 +1558,8 @@ async function finishCalibrationWithGPT() {
 
   lastXpFromGPT = xpEnd;
   lastGptReadTime = Date.now();
-  killsAtLastGPT = kills;  // Track kills at this GPT reading
-  gptXpEl.textContent = xpEnd.toFixed(4) + "%";
+  killsAtLastGPT = kills;
+  gptXpEl.textContent = xpEnd.toFixed(5) + "%";
 
   const dKills = kills - calibStartKills;
   const dXp = xpEnd - calibStartXp;
@@ -1025,41 +1571,33 @@ async function finishCalibrationWithGPT() {
     return;
   }
 
-  // Calculate new XP per kill
   const newXpPerKill = dXp / dKills;
   
   xpPerKill = newXpPerKill;
-  xpPerKillInput.value = xpPerKill.toFixed(4);
+  xpPerKillInput.value = xpPerKill.toFixed(5);
   await A.setCfg({ settings: { xpPerKill } });
   
-  addLogEntry(`✓ Calibrated! XP/kill: ${xpPerKill.toFixed(4)}% (${dKills} kills = ${dXp.toFixed(4)}%)`, 'success');
+  addLogEntry(`Ã¢Å“â€œ Calibrated! XP/kill: ${xpPerKill.toFixed(5)}% (${dKills} kills = ${dXp.toFixed(5)}%)`, 'success');
   
-  // Update baseline for sanity checks
   xpAtLevelStart = xpEnd;
   
   const wasNewMob = calibIsNewMob;
   
-  // End calibration
   calibActive = false;
   calibIsNewMob = false;
   updateCalibButton();
   
-  // For initial calibration (not New Mob): pause and reset for fresh start
   if (!wasNewMob) {
-    // Pause tracking
+    // Stop current tracking
     running = false;
     if (sessionStartedAt != null) {
       activeMsBase += Date.now() - sessionStartedAt;
       sessionStartedAt = null;
     }
-    clearInterval(loopId);
-    loopId = null;
-    clearInterval(clockId);
-    clockId = null;
-    stopSanityCheck();
+    clearAllIntervals();
     updatePlayPauseButton();
     
-    // Reset stats for fresh start
+    // Reset stats
     kills = 0;
     xpSum = 0;
     activeMsBase = 0;
@@ -1069,21 +1607,137 @@ async function finishCalibrationWithGPT() {
     lastChangeAt = 0;
     levelUpCount = 0;
     calibStartKills = 0;
-    killsAtLastGPT = 0;  // Reset since kills are reset
-    sessionStartXp = xpEnd;  // Record session start XP for Excel logging
+    killsAtLastGPT = 0;
+    sessionStartXp = xpEnd;
+    killTimestamps = [];
     
     refreshStats();
+    updateTempoStats();
     addLogEntry('Stats reset - ready to start fresh!', 'info');
+    
+    // Auto-start if enabled
+    if (autoStartAfterCalib) {
+      startTracking();
+      addLogEntry('Auto-started tracking after calibration', 'info');
+    }
   } else {
-    // For New Mob: just update the reference point, keep everything running
     calibStartKills = kills;
-    killsAtLastGPT = kills;  // Update reference point
+    killsAtLastGPT = kills;
     addLogEntry('Continuing session with new XP/kill rate', 'info');
   }
   
   updateMobsToLevel();
 }
 
+// ---- AOE Calibration ----
+aoeCalibBtn.addEventListener("click", async () => {
+  btnFlash(aoeCalibBtn);
+  
+  if (aoeCalibActive) {
+    // Finish calibration
+    await finishAoeCalibration();
+    return;
+  }
+  
+  if (!roi) {
+    alert("Capture the XP bar first.");
+    return;
+  }
+  
+  addLogEntry('Starting AOE calibration - reading GPT...', 'info');
+  
+  const xpStart = await readXpWithGPT();
+  if (xpStart == null) {
+    addLogEntry('AOE calibration failed: GPT read error', 'error');
+    return;
+  }
+  
+  // Reset stats
+  kills = 0;
+  xpSum = 0;
+  activeMsBase = 0;
+  sessionStartedAt = null;
+  sessionStartTime = null;
+  levelUpCount = 0;
+  killTimestamps = [];
+  lastAoeXp = xpStart;
+  
+  lastXpFromGPT = xpStart;
+  killsAtLastGPT = 0;
+  gptXpEl.textContent = xpStart.toFixed(5) + "%";
+  
+  aoeCalibActive = true;
+  aoeCalibStartXp = xpStart;
+  aoeCalibStartTime = Date.now();
+  
+  refreshStats();
+  updateTempoStats();
+  updateAoeCalibButton();
+  
+  addLogEntry(`AOE Calibration started at ${xpStart.toFixed(5)}% - kill mobs then press Finish`, 'info');
+});
+
+async function finishAoeCalibration() {
+  const xpEnd = await readXpWithGPT();
+  if (xpEnd == null) {
+    addLogEntry('AOE calibration finish failed: GPT read error', 'error');
+    aoeCalibActive = false;
+    updateAoeCalibButton();
+    return;
+  }
+  
+  lastXpFromGPT = xpEnd;
+  killsAtLastGPT = kills;
+  gptXpEl.textContent = xpEnd.toFixed(5) + "%";
+  
+  const xpGained = xpEnd - aoeCalibStartXp;
+  
+  if (xpGained <= 0) {
+    addLogEntry('AOE calibration failed: no XP gained', 'error');
+    aoeCalibActive = false;
+    updateAoeCalibButton();
+    return;
+  }
+  
+  
+  // Get mob count from input field
+  const mobs = parseInt(aoeMobCountInput.value) || 3;
+  
+  if (mobs <= 0) {
+    addLogEntry('AOE calibration failed: invalid mob count', 'error');
+    aoeCalibActive = false;
+    updateAoeCalibButton();
+    return;
+  }
+  
+  const newXpPerMob = xpGained / mobs;
+  
+  aoeXpPerMob = newXpPerMob;
+  aoeXpPerMobInput.value = aoeXpPerMob.toFixed(5);
+  await A.setCfg({ settings: { aoeXpPerMob } });
+  
+  addLogEntry(`âœ“ AOE Calibrated! XP/mob: ${aoeXpPerMob.toFixed(5)}% (${mobs} mobs = ${xpGained.toFixed(5)}%)`, 'success');
+  
+  // Reset for fresh start
+  kills = 0;
+  xpSum = 0;
+  activeMsBase = 0;
+  sessionStartedAt = null;
+  sessionStartTime = null;
+  lastAoeXp = xpEnd;
+  killTimestamps = [];
+  
+  aoeCalibActive = false;
+  aoeCalibStartXp = null;
+  
+  refreshStats();
+  updateTempoStats();
+  updateAoeCalibButton();
+  
+  addLogEntry('Ready to start AOE tracking!', 'info');
+}
+
+// ---- GPT Read XP ----
 async function readXpWithGPT() {
   if (!roi) return null;
   const dataUrl = await A.captureROIFromGame();
@@ -1096,4 +1750,75 @@ async function readXpWithGPT() {
     console.error("readXpWithGPT error:", err);
     return null;
   }
+}
+
+// ---- Level Tracking ----
+async function checkForLevelUpBetweenSessions() {
+  if (lastSessionEndXp === null) return;
+  
+  // Read current XP
+  const currentXp = await readXpWithGPT();
+  if (currentXp === null) return;
+  
+  // If current XP is significantly lower than last session end XP, we likely leveled up
+  // (e.g., ended at 96%, now at 20% = level up happened)
+  if (lastSessionEndXp > 50 && currentXp < lastSessionEndXp - 30) {
+    // Calculate how many level ups might have occurred
+    const estimatedLevelUps = Math.ceil((lastSessionEndXp - currentXp + 100) / 100);
+    if (estimatedLevelUps > 0 && estimatedLevelUps < 10) {
+      characterLevel += estimatedLevelUps;
+      if (charLevelInput) charLevelInput.value = String(characterLevel);
+      await A.setCfg({ settings: { characterLevel } });
+      
+      const xpGainedOutside = (100 - lastSessionEndXp) + currentXp + ((estimatedLevelUps - 1) * 100);
+      addLogEntry(`Detected ${estimatedLevelUps} level up(s) outside session! (+${xpGainedOutside.toFixed(1)}% quest/dungeon XP)`, 'level-up');
+      addLogEntry(`Level updated: ${characterLevel - estimatedLevelUps} â†’ ${characterLevel}`, 'success');
+      
+      // Save this as quest/dungeon XP for Excel
+      await saveOutsideXpToExcel(xpGainedOutside, estimatedLevelUps);
+    }
+  }
+  
+  // Update last session XP display
+  if (lastSessionXpEl) {
+    lastSessionXpEl.textContent = currentXp.toFixed(2) + '%';
+  }
+}
+
+async function saveOutsideXpToExcel(xpGained, levelUps) {
+  const now = new Date();
+  const sessionData = {
+    date: fmtDate(now),
+    startTime: '--:--:--',
+    endTime: fmtTime(now),
+    duration: '--:--:--',
+    kills: 0,
+    xpSum: xpGained.toFixed(5),
+    xpPerHour: '0.00000',
+    xpPerKill: '0.00000',
+    levelUps: levelUps,
+    notes: 'Quest/Dungeon XP (outside session)'
+  };
+  
+  try {
+    await A.saveSession(sessionData);
+  } catch (e) {
+    console.error('Failed to save outside XP:', e);
+  }
+}
+
+// Level input change listener
+if (charLevelInput) {
+  charLevelInput.addEventListener('change', async () => {
+    characterLevel = Math.max(1, Math.round(parseInt(charLevelInput.value) || 1));
+    charLevelInput.value = String(characterLevel);
+    await A.setCfg({ settings: { characterLevel } });
+  });
+}
+
+// Update level on level up during session
+function incrementLevelDuringSession() {
+  characterLevel++;
+  if (charLevelInput) charLevelInput.value = String(characterLevel);
+  A.setCfg({ settings: { characterLevel } }).catch(console.error);
 }

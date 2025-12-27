@@ -1,0 +1,494 @@
+/* launcher.css â€“ Flyff Mob Tracker Launcher */
+
+:root {
+  --bg-dark: #05050a;
+  --bg-card: #0d0d14;
+  --bg-hover: #151520;
+  --border: #1a1a2e;
+  --text: #e8e8f0;
+  --text-dim: #888899;
+  --accent: #ffd800;
+  --accent-hover: #ffed4a;
+  --success: #22c55e;
+  --error: #ef4444;
+  --info: #3b82f6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  background: var(--bg-dark);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.launcher {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 20px;
+}
+
+.launcher-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.launcher-header h1 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.version {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* Characters Section */
+.characters-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-header h2 {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.character-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 8px;
+}
+
+.character-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.character-list::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.no-characters {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.no-characters .hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+/* Character Card */
+.character-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.character-card:hover {
+  background: var(--bg-hover);
+  border-color: var(--text-dim);
+}
+
+.character-card.selected {
+  border-color: var(--accent);
+  background: rgba(255, 216, 0, 0.05);
+}
+
+.character-card.running {
+  border-color: var(--success);
+  background: rgba(34, 197, 94, 0.05);
+}
+
+.character-card.running.selected {
+  border-color: var(--success);
+}
+
+.running-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 6px;
+  background: var(--success);
+  color: #000;
+  border-radius: 4px;
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.char-color {
+  width: 8px;
+  height: 40px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.char-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.char-name {
+  font-weight: 600;
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+
+.char-details {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.char-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.char-actions button {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.char-actions button:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.char-actions button.delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--error);
+}
+
+.char-actions button.focus:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--info);
+}
+
+.char-actions button.stop:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--error);
+}
+
+/* Mode Badges */
+.mode-badge {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 500;
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+.mode-badge.mode-1v1 {
+  background: var(--accent);
+  color: #000;
+}
+
+.mode-badge.mode-aoe {
+  background: var(--info);
+  color: #fff;
+}
+
+.mode-badge.mode-none {
+  background: var(--text-dim);
+  color: var(--bg-dark);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-add {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-add:hover {
+  background: var(--bg-card);
+  border-color: var(--text-dim);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card);
+}
+
+.btn-text {
+  background: transparent;
+  color: var(--text-dim);
+  padding: 8px 12px;
+}
+
+.btn-text:hover {
+  color: var(--text);
+}
+
+.btn-large {
+  padding: 14px 24px;
+  font-size: 15px;
+  flex: 1;
+}
+
+/* Quick Actions */
+.quick-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Footer */
+.launcher-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.footer-text {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 400px;
+  max-width: 90%;
+}
+
+.modal-content h3 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.field-input {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+/* Color Picker */
+.color-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.color-picker input[type="radio"] {
+  display: none;
+}
+
+.color-picker label {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.color-picker input[type="radio"]:checked + label {
+  border-color: var(--text);
+  transform: scale(1.1);
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.settings-section {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.data-path {
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--bg-dark);
+  padding: 8px 10px;
+  border-radius: 6px;
+  margin: 8px 0;
+  word-break: break-all;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Plugins Section */
+.plugins-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.plugins-title {
+  font-size: 12px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.plugins-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btn-plugin {
+  background: linear-gradient(135deg, var(--bg-hover) 0%, var(--bg-card) 100%);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 12px 10px;
+  font-size: 12px;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.btn-plugin:hover {
+  border-color: #66ccff;
+  background: linear-gradient(135deg, var(--bg-card) 0%, #1a2030 100%);
+}
+
+.btn-plugin svg {
+  color: #66ccff;
+}
+
+.btn-plugin-purple:hover {
+  border-color: #a855f7;
+  background: linear-gradient(135deg, var(--bg-card) 0%, #1f1530 100%);
+}
+
+.btn-plugin-purple svg {
+  color: #a855f7;
+}

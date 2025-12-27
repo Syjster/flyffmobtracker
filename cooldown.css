@@ -1,0 +1,595 @@
+/* cooldown.css - Flyff Buff Cooldown Timer */
+
+:root {
+  --bg-dark: #05050a;
+  --bg-card: #0d0d14;
+  --bg-hover: #151520;
+  --border: #1a1a2e;
+  --text: #e8e8f0;
+  --text-dim: #888899;
+  --accent: #ffd800;
+  --accent-hover: #ffed4a;
+  --success: #22c55e;
+  --error: #ef4444;
+  --info: #3b82f6;
+  --warning: #ffaa44;
+  --forward: #a855f7;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  background: var(--bg-dark);
+  color: var(--text);
+  overflow: hidden;
+}
+
+.cooldown-app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* Header */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  -webkit-app-region: drag;
+}
+
+.app-header h1 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+/* Timers Container */
+.timers-container {
+  flex: 1;
+  overflow: hidden;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timers-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.timers-container::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.empty-state .hint {
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+/* Timer Card */
+.timer-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  flex: 1;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.timer-card:hover {
+  border-color: var(--text-dim);
+}
+
+.timer-card.running {
+  border-color: var(--accent);
+}
+
+.timer-card.complete {
+  animation: flash 0.5s ease infinite alternate;
+}
+
+@keyframes flash {
+  from { 
+    background: var(--bg-card);
+    border-color: var(--success);
+  }
+  to { 
+    background: rgba(34, 197, 94, 0.2);
+    border-color: var(--success);
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.3);
+  }
+}
+
+.timer-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: rgba(255, 216, 0, 0.1);
+  transition: width 0.1s linear;
+  pointer-events: none;
+}
+
+.timer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  position: relative;
+  z-index: 1;
+}
+
+.timer-name {
+  font-weight: 600;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timer-color-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.auto-badge {
+  font-size: 11px;
+  color: var(--forward);
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+.timer-hotkey {
+  background: var(--bg-hover);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: monospace;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+}
+
+.timer-badges {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.timer-char-badge {
+  background: rgba(102, 204, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  color: #66ccff;
+  border: 1px solid rgba(102, 204, 255, 0.3);
+}
+
+.timer-display {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.timer-countdown {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: 'Consolas', 'Monaco', monospace;
+  text-align: center;
+  line-height: 1;
+}
+
+.timer-countdown.idle {
+  color: var(--text-dim);
+  opacity: 0.6;
+}
+
+.timer-countdown.running {
+  color: var(--text);
+}
+
+.timer-countdown.low {
+  color: var(--warning);
+}
+
+.timer-countdown.complete {
+  color: var(--success);
+}
+
+.timer-status {
+  font-size: 9px;
+  text-align: center;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.timer-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 10;
+}
+
+.timer-card:hover .timer-actions {
+  opacity: 1;
+}
+
+.timer-actions button {
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  pointer-events: all;
+}
+
+.timer-actions button svg {
+  width: 12px;
+  height: 12px;
+  pointer-events: none;
+}
+
+.timer-actions button:hover {
+  background: var(--border);
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
+.timer-actions button.edit:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: var(--info);
+  border-color: var(--info);
+}
+
+.timer-actions button.reset:hover {
+  background: rgba(255, 170, 68, 0.2);
+  color: var(--warning);
+  border-color: var(--warning);
+}
+
+.timer-actions button.delete:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: var(--error);
+  border-color: var(--error);
+}
+
+/* Status Bar */
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--bg-card);
+  border-top: 1px solid var(--border);
+  font-size: 10px;
+}
+
+.status-text {
+  color: var(--text-dim);
+}
+
+.hotkey-indicator {
+  font-size: 12px;
+  opacity: 0.3;
+}
+
+.hotkey-indicator.active {
+  opacity: 1;
+  color: var(--success);
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  color: var(--text-dim);
+  border-radius: 6px;
+}
+
+.btn-icon:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.btn-add {
+  background: var(--accent);
+  color: #000;
+  padding: 6px 12px;
+}
+
+.btn-add:hover {
+  background: var(--accent-hover);
+}
+
+.btn-stop-all {
+  background: var(--error);
+  color: #fff;
+  padding: 6px 12px;
+}
+
+.btn-stop-all:hover {
+  background: #dc2626;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #000;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-hover);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-card);
+}
+
+.btn-danger {
+  background: var(--error);
+  color: #fff;
+}
+
+.btn-danger:hover {
+  filter: brightness(1.1);
+}
+
+.btn-capture.capturing {
+  background: var(--warning);
+  animation: pulse 1s ease infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Modal */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal.hidden {
+  display: none;
+}
+
+.modal-content {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+}
+
+.modal-content h3 {
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.field-label {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.field-input {
+  background: var(--bg-dark);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.field-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.field-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.checkbox-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-field input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+/* Hotkey Capture */
+.hotkey-capture {
+  display: flex;
+  gap: 8px;
+}
+
+.hotkey-input {
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  font-family: monospace;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hotkey-input.capturing {
+  border-color: var(--warning);
+  background: rgba(255, 170, 68, 0.1);
+}
+
+.btn-capture {
+  padding: 8px 14px;
+  font-size: 12px;
+  background: var(--info);
+  color: #fff;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* Color Picker */
+.color-picker {
+  display: flex;
+  gap: 8px;
+}
+
+.color-picker input[type="radio"] {
+  display: none;
+}
+
+.color-picker label {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.color-picker input[type="radio"]:checked + label {
+  border-color: var(--text);
+  transform: scale(1.1);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Macro Section */
+.macro-section {
+  margin: 16px 0;
+  padding: 12px;
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.2);
+  border-radius: 8px;
+}
+
+.macro-section .checkbox-field {
+  margin-bottom: 0;
+}
+
+.auto-press-options {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.auto-press-options .field {
+  margin-bottom: 12px;
+}
+
+.auto-press-options .field:last-child {
+  margin-bottom: 0;
+}
+
+.hidden {
+  display: none !important;
+}

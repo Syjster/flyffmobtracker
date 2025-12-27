@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" 
+        content="default-src 'self'; 
+                 script-src 'self'; 
+                 style-src 'self' 'unsafe-inline'; 
+                 img-src 'self' data:; 
+                 connect-src 'self';
+                 font-src 'self';
+                 object-src 'none';
+                 base-uri 'self';
+                 form-action 'self';">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Key Forwarder</title>
+  <link rel="stylesheet" href="keyforward.css" />
+</head>
+<body>
+  <div class="keyforward-app">
+    <header class="app-header">
+      <h1>Key Forwarder</h1>
+      <div class="header-actions">
+        <button id="addRuleBtn" class="btn btn-add" title="Add Rule">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="info-banner">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+      </svg>
+      <span>Forward keypresses from one game window to another</span>
+    </div>
+
+    <div id="rulesContainer" class="rules-container">
+      <div class="empty-state">
+        <p>No forwarding rules</p>
+        <p class="hint">Click + to add a key forwarding rule</p>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusText" class="status-text">Ready</span>
+      <label class="toggle-label">
+        <input type="checkbox" id="enabledToggle" checked />
+        <span class="toggle-text">Enabled</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- Add/Edit Rule Modal -->
+  <div id="ruleModal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="ruleModalTitle">Add Forwarding Rule</h3>
+      
+      <label class="field">
+        <span class="field-label">Rule Name</span>
+        <input id="ruleName" type="text" class="field-input" placeholder="e.g., RM buffs to Blade" />
+      </label>
+      
+      <label class="field">
+        <span class="field-label">Source Character (press key here)</span>
+        <select id="sourceChar" class="field-input">
+          <option value="">Select character...</option>
+        </select>
+      </label>
+      
+      <label class="field">
+        <span class="field-label">Target Character (receives key)</span>
+        <select id="targetChar" class="field-input">
+          <option value="">Select character...</option>
+        </select>
+      </label>
+      
+      <label class="field">
+        <span class="field-label">Keys to Forward</span>
+        <div class="keys-capture">
+          <input id="forwardKeys" type="text" class="field-input keys-input" readonly placeholder="Click to capture keys..." />
+          <button id="captureKeysBtn" class="btn btn-capture">Capture</button>
+        </div>
+        <span class="field-hint">Capture multiple keys (e.g., 1, 2, 3, 4)</span>
+      </label>
+      
+      <div class="modal-actions">
+        <button id="cancelRuleBtn" class="btn btn-secondary">Cancel</button>
+        <button id="deleteRuleBtn" class="btn btn-danger hidden">Delete</button>
+        <button id="saveRuleBtn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="keyforward-renderer.js"></script>
+</body>
+</html>

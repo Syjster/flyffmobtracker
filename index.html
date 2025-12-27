@@ -2,7 +2,19 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Flyff Mob Tracker</title>
+  <meta http-equiv="Content-Security-Policy" 
+        content="default-src 'self'; 
+                 script-src 'self'; 
+                 style-src 'self' 'unsafe-inline'; 
+                 img-src 'self' data: blob:; 
+                 connect-src 'self' https://api.openai.com;
+                 font-src 'self';
+                 object-src 'none';
+                 base-uri 'self';
+                 form-action 'self';">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Flyff Mob Tracker v2</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -12,35 +24,78 @@
       <div class="sidebar-inner">
         <header class="sidebar-header">
           <h1>Flyff Mob Tracker</h1>
+          <span class="version-tag">v2.0 OCR</span>
         </header>
 
-        <!-- Stats FIRST (moved to top) -->
+        <!-- SESSION STATS (renamed from Session) -->
         <section class="section stats">
-          <div class="section-title">Session</div>
+          <div class="section-title">Session Stats</div>
 
-          <div class="stat-card">
-            <div class="stat-label">Elapsed</div>
-            <div id="elapsed" class="stat-value">00:00:00</div>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-label">Elapsed</div>
+              <div id="elapsed" class="stat-value">00:00:00</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">Kills</div>
+              <div id="kills" class="stat-value">0</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">Total XP</div>
+              <div id="xp" class="stat-value">0.00000%</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">XP/hr</div>
+              <div id="xphr" class="stat-value">0.00000%</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">Mobs to Level</div>
+              <div id="mobsToLevel" class="stat-value">--</div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-label">Time to Level</div>
+              <div id="timeToLevel" class="stat-value">--:--:--</div>
+            </div>
+
+            <div class="stat-card wide">
+              <div class="stat-label">Est. Level Up</div>
+              <div id="estLevelTime" class="stat-value">--:--</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- TEMPO STATS (Rolling window) -->
+        <section class="section tempo-stats">
+          <div class="section-title">
+            Tempo Stats 
+            <span class="tempo-hint">(last <input id="tempoWindowInput" type="number" min="5" max="200" value="50" class="tempo-window-input" title="Rolling window size (5-200 kills)" /> kills)</span>
           </div>
 
-          <div class="stat-card">
-            <div class="stat-label">Kills</div>
-            <div id="kills" class="stat-value">0</div>
-          </div>
+          <div class="stats-grid tempo-grid">
+            <div class="stat-card tempo">
+              <div class="stat-label">XP/hr</div>
+              <div id="tempoXphr" class="stat-value tempo-value">--</div>
+            </div>
 
-          <div class="stat-card">
-            <div class="stat-label">Total XP</div>
-            <div id="xp" class="stat-value">0.0000%</div>
-          </div>
+            <div class="stat-card tempo">
+              <div class="stat-label">Mobs/hr</div>
+              <div id="tempoMobshr" class="stat-value tempo-value">--</div>
+            </div>
 
-          <div class="stat-card">
-            <div class="stat-label">XP/hr</div>
-            <div id="xphr" class="stat-value">0.0000%</div>
-          </div>
+            <div class="stat-card tempo">
+              <div class="stat-label">XP/kill</div>
+              <div id="tempoXpPerKill" class="stat-value tempo-value">--</div>
+            </div>
 
-          <div class="stat-card">
-            <div class="stat-label">Mobs to Level</div>
-            <div id="mobsToLevel" class="stat-value">--</div>
+            <div class="stat-card tempo">
+              <div class="stat-label">Avg Kill Time</div>
+              <div id="tempoAvgTime" class="stat-value tempo-value">--</div>
+            </div>
           </div>
         </section>
 
@@ -71,6 +126,12 @@
             </button>
           </div>
           
+          <!-- Mode Toggle -->
+          <div class="mode-toggle">
+            <button id="mode1v1Btn" class="btn btn-mode active">1v1 Mode</button>
+            <button id="modeAoeBtn" class="btn btn-mode">AOE Mode</button>
+          </div>
+          
           <!-- Save Prems Button -->
           <button id="savePremsBtn" class="btn btn-save-prems">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
@@ -80,13 +141,13 @@
           </button>
         </section>
 
-        <!-- Session Log (moved above settings, taller) -->
+        <!-- Session Log -->
         <section class="section log-section">
           <div class="section-title">Session Log</div>
           <div id="sessionLog" class="session-log"></div>
         </section>
 
-        <!-- Settings (collapsible, visible by default) -->
+        <!-- Settings (collapsible) -->
         <section class="section settings">
           <input type="checkbox" id="showSettingsChk" class="collapse-checkbox" checked />
           <label for="showSettingsChk" class="section-title clickable">
@@ -94,31 +155,108 @@
           </label>
 
           <div id="settingsContent" class="collapsible-content">
-            <label class="field">
-              <span class="field-label">XP per kill (%)</span>
-              <input id="xpPerKill" type="text" class="field-input" value="0.0500" />
-            </label>
+            <!-- 1v1 Mode Settings -->
+            <div id="settings1v1" class="mode-settings">
+              <div class="mode-label">1v1 Mode Settings</div>
+              
+              <label class="field">
+                <span class="field-label">XP per kill (%)</span>
+                <input id="xpPerKill" type="text" class="field-input" value="0.05000" />
+              </label>
 
-            <label class="field">
-              <span class="field-label">Pixel diff trigger (%)</span>
-              <input id="diffTrigger" type="text" class="field-input" value="6.5" />
-            </label>
+              <label class="field">
+                <span class="field-label">Pixel diff trigger (%)</span>
+                <input id="diffTrigger" type="text" class="field-input" value="6.5" />
+              </label>
 
-            <label class="field">
-              <span class="field-label">Cooldown (ms)</span>
-              <input id="diffCooldown" type="text" class="field-input" value="800" />
-            </label>
+              <label class="field">
+                <span class="field-label">Cooldown (ms)</span>
+                <input id="diffCooldown" type="text" class="field-input" value="800" />
+              </label>
 
-            <label class="field">
-              <span class="field-label">Calibration kills</span>
-              <input id="calibKills" type="number" min="1" max="20" value="3" class="field-input small" />
-            </label>
+              <label class="field">
+                <span class="field-label">Calibration kills</span>
+                <input id="calibKills" type="number" min="1" max="20" value="3" class="field-input small" />
+              </label>
 
-            <button id="calibBtn" class="btn btn-gpt full-width-btn">
-              <span class="calib-text">GPT Auto Calibrate</span>
-            </button>
+              <button id="calibBtn" class="btn btn-gpt full-width-btn">
+                <span class="calib-text">GPT Auto Calibrate</span>
+              </button>
+            </div>
             
-            <p class="settings-hint">Collapse after calibration - settings are saved automatically.</p>
+            <!-- AOE Mode Settings -->
+            <div id="settingsAoe" class="mode-settings" style="display: none;">
+              <div class="mode-label">AOE Mode Settings</div>
+              <p class="aoe-hint">GPT reads XP every 20-30 seconds and calculates kills automatically.</p>
+              
+              <label class="field">
+                <span class="field-label">GPT Poll Interval (sec)</span>
+                <input id="aoePollInterval" type="number" min="10" max="60" value="25" class="field-input small" />
+              </label>
+              
+              <label class="field">
+                <span class="field-label">XP per mob (initial)</span>
+                <input id="aoeXpPerMob" type="text" class="field-input" value="0.05000" />
+              </label>
+              
+              <button id="aoeCalibBtn" class="btn btn-gpt full-width-btn">
+                <span class="aoe-calib-text">Start AOE Calibration</span>
+              </button>
+              
+              <!-- Mob count input - shown during calibration -->
+              <div id="aoeMobCountSection" class="aoe-mob-count-section hidden">
+                <label class="field">
+                  <span class="field-label">How many mobs did you kill?</span>
+                  <input id="aoeMobCount" type="number" min="1" max="50" value="3" class="field-input" />
+                </label>
+              </div>
+              
+              <div class="aoe-calib-instructions">
+                <p class="aoe-calib-hint"><strong>How to calibrate:</strong></p>
+                <ol class="aoe-steps">
+                  <li>Press "Start AOE Calibration"</li>
+                  <li>Gather <strong>3 or more</strong> mobs together</li>
+                  <li>Kill them all with AOE</li>
+                  <li>Enter the number of mobs killed below</li>
+                  <li>Press "Finish Calibration"</li>
+                </ol>
+              </div>
+            </div>
+            
+            <!-- Character Level Settings -->
+            <div class="level-settings">
+              <div class="mode-label">Character Level</div>
+              
+              <label class="field">
+                <span class="field-label">Current Level</span>
+                <input id="charLevel" type="number" min="1" max="400" value="1" class="field-input small" />
+              </label>
+              
+              <div class="level-info">
+                <span class="field-label">Last Session XP:</span>
+                <span id="lastSessionXp" class="level-value">--</span>
+              </div>
+            </div>
+            
+            <!-- Auto Tracking Settings (shared between modes) -->
+            <div class="auto-settings">
+              <div class="mode-label">Auto Tracking</div>
+              
+              <label class="field checkbox-field">
+                <input type="checkbox" id="autoStartChk" checked />
+                <span class="field-label">Auto-start after calibration</span>
+              </label>
+              
+              <label class="field checkbox-field">
+                <input type="checkbox" id="autoStopChk" checked />
+                <span class="field-label">Auto-stop on idle</span>
+              </label>
+              
+              <label class="field">
+                <span class="field-label">Idle timeout (seconds)</span>
+                <input id="autoStopTimeout" type="number" min="10" max="600" value="60" class="field-input small" />
+              </label>
+            </div>
           </div>
         </section>
 
@@ -150,6 +288,21 @@
               <span class="debug-stat-label">GPT XP Reading:</span>
               <span id="gptXp" class="debug-stat-value">--.--%</span>
             </div>
+            
+            <div class="debug-stat">
+              <span class="debug-stat-label">GPT Corrections:</span>
+              <span id="gptCorrections" class="debug-stat-value">0</span>
+            </div>
+            
+            <div class="debug-stat">
+              <span class="debug-stat-label">Correction Rate:</span>
+              <span id="correctionRate" class="debug-stat-value">0%</span>
+            </div>
+            
+            <div id="calibrationWarning" class="calibration-warning hidden">
+              <span class="warning-icon">⚠️</span>
+              <span class="warning-text">High correction rate! Consider increasing Pixel diff trigger.</span>
+            </div>
 
             <div class="debug-previews">
               <canvas id="rawC"></canvas>
@@ -164,6 +317,14 @@
               <path d="M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
             </svg>
             <span>Session History</span>
+          </button>
+          
+          <!-- Back to Launcher button -->
+          <button id="backToLauncherBtn" class="btn btn-history" style="margin-top: 8px;">
+            <svg class="icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </svg>
+            <span>Back to Launcher</span>
           </button>
         </section>
       </div>

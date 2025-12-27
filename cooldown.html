@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    script-src 'self';
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: blob:;
+    connect-src 'self';
+    media-src 'self';
+    object-src 'none';
+    base-uri 'self';
+    form-action 'self';
+  ">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <title>Flyff Buff Cooldowns</title>
+  <link rel="stylesheet" href="cooldown.css" />
+</head>
+<body>
+  <div class="cooldown-app">
+    <header class="app-header">
+      <h1>Buff Cooldowns</h1>
+      <div class="header-actions">
+        <button id="addTimerBtn" class="btn btn-add" title="Add Timer">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+          </svg>
+        </button>
+        <button id="stopAllBtn" class="btn btn-stop-all" title="Stop All Timers">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M6 6h12v12H6z"/>
+          </svg>
+        </button>
+        <button id="settingsBtn" class="btn btn-icon" title="Settings">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16">
+            <path d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div id="timersContainer" class="timers-container">
+      <div class="empty-state">
+        <p>No timers configured</p>
+        <p class="hint">Click + to add a buff timer</p>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span id="statusText" class="status-text">Listening for hotkeys...</span>
+      <span id="hotkeyStatus" class="hotkey-indicator active">⚡</span>
+    </div>
+  </div>
+
+  <!-- Add/Edit Timer Modal -->
+  <div id="timerModal" class="modal hidden">
+    <div class="modal-content">
+      <h3 id="timerModalTitle">Add Timer</h3>
+      
+      <label class="field">
+        <span class="field-label">Buff Name</span>
+        <input id="timerName" type="text" class="field-input" placeholder="e.g., Haste, Protect, etc." />
+      </label>
+      
+      <label class="field">
+        <span class="field-label">Hotkey</span>
+        <div class="hotkey-capture">
+          <input id="timerHotkey" type="text" class="field-input hotkey-input" readonly placeholder="Press a key..." />
+          <button id="captureHotkeyBtn" class="btn btn-capture">Capture</button>
+        </div>
+        <span class="field-hint">Works when game window is focused</span>
+      </label>
+      
+      <label class="field">
+        <span class="field-label">Bind to Character</span>
+        <select id="timerCharacter" class="field-input">
+          <option value="">All Characters</option>
+          <!-- Characters populated dynamically -->
+        </select>
+        <span class="field-hint">Only triggers from selected character's window</span>
+      </label>
+      
+      <label class="field">
+        <span class="field-label">Duration (seconds)</span>
+        <input id="timerDuration" type="number" min="1" max="3600" value="60" class="field-input" />
+      </label>
+      
+      <!-- Auto-Press Macro Section -->
+      <div class="macro-section">
+        <label class="field checkbox-field">
+          <input type="checkbox" id="autoPressEnabled" />
+          <span class="field-label">Auto-press when timer ends</span>
+        </label>
+        
+        <div id="autoPressOptions" class="auto-press-options hidden">
+          <label class="field">
+            <span class="field-label">Send key to character</span>
+            <select id="autoPressChar" class="field-input">
+              <option value="">Same as bound character</option>
+              <!-- Characters populated dynamically -->
+            </select>
+          </label>
+          
+          <label class="field">
+            <span class="field-label">Key to send</span>
+            <div class="hotkey-capture">
+              <input id="autoPressKey" type="text" class="field-input hotkey-input" readonly placeholder="Same as hotkey" />
+              <button id="captureAutoPressBtn" class="btn btn-capture">Capture</button>
+            </div>
+            <span class="field-hint">Leave empty to use same hotkey</span>
+          </label>
+        </div>
+      </div>
+      
+      <label class="field">
+        <span class="field-label">Color</span>
+        <div class="color-picker">
+          <input type="radio" name="timerColor" value="#ffd800" id="colorYellow" checked />
+          <label for="colorYellow" style="background: #ffd800"></label>
+          
+          <input type="radio" name="timerColor" value="#22c55e" id="colorGreen" />
+          <label for="colorGreen" style="background: #22c55e"></label>
+          
+          <input type="radio" name="timerColor" value="#3b82f6" id="colorBlue" />
+          <label for="colorBlue" style="background: #3b82f6"></label>
+          
+          <input type="radio" name="timerColor" value="#ef4444" id="colorRed" />
+          <label for="colorRed" style="background: #ef4444"></label>
+          
+          <input type="radio" name="timerColor" value="#a855f7" id="colorPurple" />
+          <label for="colorPurple" style="background: #a855f7"></label>
+          
+          <input type="radio" name="timerColor" value="#66ccff" id="colorCyan" />
+          <label for="colorCyan" style="background: #66ccff"></label>
+        </div>
+      </label>
+      
+      <div class="modal-actions">
+        <button id="cancelTimerBtn" class="btn btn-secondary">Cancel</button>
+        <button id="deleteTimerBtn" class="btn btn-danger" style="display: none;">Delete</button>
+        <button id="saveTimerBtn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-content">
+      <h3>Settings</h3>
+      
+      <label class="field checkbox-field">
+        <input type="checkbox" id="alwaysOnTopChk" checked />
+        <span class="field-label">Always on top</span>
+      </label>
+      
+      <label class="field checkbox-field">
+        <input type="checkbox" id="flashOnCompleteChk" checked />
+        <span class="field-label">Flash when timer completes</span>
+      </label>
+      
+      <label class="field checkbox-field">
+        <input type="checkbox" id="soundOnCompleteChk" />
+        <span class="field-label">Sound alert when complete</span>
+      </label>
+      
+      <label class="field">
+        <span class="field-label">Flash duration (ms)</span>
+        <input id="flashDuration" type="number" min="500" max="5000" value="2000" class="field-input" />
+      </label>
+      
+      <div class="modal-actions">
+        <button id="closeSettingsBtn" class="btn btn-primary">Save & Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="cooldown-renderer.js"></script>
+</body>
+</html>

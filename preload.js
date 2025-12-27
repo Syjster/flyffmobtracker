@@ -26,4 +26,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   // ----- Game Control -----
   reloadGame: () => ipcRenderer.invoke("game:reload"),
   stopGame: () => ipcRenderer.invoke("game:stop"),
+  
+  // ----- Launcher -----
+  backToLauncher: () => ipcRenderer.invoke("launcher:back"),
+  getCurrentChar: () => ipcRenderer.invoke("launcher:get-current-char"),
 });
