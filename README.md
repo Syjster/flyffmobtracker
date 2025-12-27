@@ -1,63 +1,186 @@
 # Flyff Mob Tracker
 
-Electron-based XP/Mob tracker for Flyff Universe.
+A desktop application for tracking mobs, XP, and session statistics in Flyff Universe. Features GPT-powered XP calibration, automatic level-up detection, and Excel session logging.
 
-## Download
-Grab the **Setup** or **Portable** EXE from the [Releases](https://github.com/Syjster/flyffmobtracker/releases).
+![Electron](https://img.shields.io/badge/Electron-32.0-47848F?logo=electron)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+## Features
+
+- **Real-time mob Tracking** - Detects mobs via XP bar pixel changes
+- **GPT-Powered XP Calibration** - Uses GPT-4 Vision to read exact XP percentage
+- **Automatic Level-Up Detection** - Detects level ups and auto-recalibrates XP/mob
+- **Mobs to Level Counter** - Live countdown updated with each mob
+- **Session Statistics** - Tracks mobs, XP gained, XP/hour, elapsed time
+- **Excel Session Logging** - Auto-saves sessions with start/end XP details
+- **Save Prems Button** - Close game to save premium items, resume anytime
+- **New Mob Button** - Switch mob types without losing session progress
+- **Sanity Checks** - Periodic GPT verification to correct tracking drift
+
+## Installation
+
+### Download Release
+1. Go to [Releases](https://github.com/Syjster/flyffmobtracker/releases)
+2. Download `Flyff Mob Tracker Setup X.X.X.exe` (installer) or `Flyff Mob Tracker Portable X.X.X.exe`
+3. Run and enjoy!
+
+## Setup
+
+### 1. GPT API Key (Required for calibration)
+
+You need an OpenAI API key for GPT-powered XP reading. Choose one method:
+
+**Option A: Config File (Recommended)**
+1. Navigate to `Documents/FlyffMobTracker/`
+2. Create `gpt-config.json`:
+```json
+{
+  "openaiKey": "sk-your-api-key-here"
+}
+```
+
+> ⚠️ **Security Note:** Never share your API key or commit it to version control. The `.env` file is in `.gitignore` by default.
+
+### 2. Capture the XP Bar
+
+1. Click **"▶ Capture Settings"** to expand the capture section
+2. Click **"Capture"** and hover your mouse over the XP percentage text
+3. Wait for the 3-second countdown
+4. Click **"Fine-tune"** to adjust the capture area if needed
+5. The yellow box should cover just the XP percentage digits (e.g., "54.4444%")
+
+### 3. Calibrate XP per mob
+
+1. Click **"GPT Auto Calibrate"** to start calibration
+2. mob the specified number of mobs (default: 3)
+3. The app will calculate your exact XP per mob
+4. Stats reset automatically - you're ready to grind!
 
 ## Usage
-1. **Capture XP Bar** (hover your mouse over your Status Window shortcut T in Flyff U).
-3. **Fine-Tune Capture** (Known bug puts window back, minimize all your open programs and you'll find it)→ adjust → Apply.
 
-   <img width="674" height="535" alt="Skärmbild 2025-11-05 230800" src="https://github.com/user-attachments/assets/36213fa1-e9ea-4d18-9e22-7541be2516dd" />
-   <img width="343" height="273" alt="Skärmbild 2025-11-05 230806" src="https://github.com/user-attachments/assets/73679835-9460-402b-856b-1d729798ac43" />
-4. Make sure it Captures only the xp bar, hit "Debug" to see preview of the captured area.
+### Controls
 
-   <img width="316" height="454" alt="Skärmbild 2025-11-05 231146" src="https://github.com/user-attachments/assets/5511ed37-d885-44ae-86e0-19ac28a4adec" />
-5. **Start** to track, Stop=Pause, Reset=resets the counter
+| Button | Action |
+|--------|--------|
+| **▶ / ⏸** | Start/Pause tracking |
+| **↻** | Reset session (saves to Excel first) |
+| **New Mob** | Switch to different mob type (preserves session) |
+| **Save Prems** | Close game to save premium items |
+| **Resume Session** | Reload game after saving prems |
+| **GPT Auto Calibrate** | Calibrate XP per mob |
+| **Session History** | Open Excel log folder |
 
-3. (Optional) Enable GPT XP OCR
+### Workflow
 
-The tracker can use GPT-4o-mini to read exact XP % from the screen.
-This unlocks:
+1. **Start Session:** Capture XP bar → Calibrate → Press Play
+2. **Grinding:** App tracks mobs automatically via pixel detection
+3. **Switch Mobs:** Click "New Mob" → mob 3 of the new mob → Continue
+4. **Save Prems:** Click "Save Prems" → Do other things → Click "Resume Session"
+5. **Level Up:** Detected automatically → Auto-recalibrates → Continues tracking
+6. **End Session:** Press Pause or Reset (auto-saves to Excel)
 
-Auto-calibration of XP per kill
-Accurate “Mobs to Level Up”
-Real XP values instead of pixel approximations
-To use this feature, add your own API key.
+### Level-Up Detection
 
-🔑 Step A — Create a GPT API Key
-Go to: https://platform.openai.com/account/api-keys
-Click Create new secret key.
-Copy the key (starts with sk-...).
+The app detects level-ups in two ways:
+1. **Mobs to Level reaches 0** → Triggers GPT check → Confirms level up
+2. **Sanity check** → If expected XP > 90% but actual < 30% → Level up detected
 
-📁 Step B — Add your key to the program folde
-In the same folder as the .exe, create a new file:
-gpt-config.json (Be sure it saves as .json and not .json.txt. Best is to go into notepad > Save As> All Files (Not .txt) and save it in the folder with the exe.)
-Paste the following:
+When a level-up is detected:
+- Session log shows "🎉 LEVEL UP #X!"
+- Auto-recalibration starts immediately
+- Session stats (mobs, time, XP) are preserved
+- Excel log notes include level-up count
 
-{
-  "OPENAI_API_KEY": "your-api-key-here"
-}
+## Settings
 
-Save the file and restart the tracker.
+| Setting | Description | Default |
+|---------|-------------|---------|
+| **XP per mob (%)** | XP gained per mob mob | 0.0500 |
+| **Pixel diff trigger (%)** | Sensitivity for detecting changes | 0.065 |
+| **Cooldown (ms)** | Minimum time between mob detections | 800 |
+| **Calibration mobs** | Number of mobs for calibration | 3 |
 
-Confirmation
+## Session Logging
 
-If the key is valid:
-GPT XP will appear under "GPT XP"
-Calibration and reading will work
-No more “API key missing” messages
-If you don’t want GPT OCR:
-Simply don’t create gpt-config.json
-The program works normally without it
+Sessions are automatically saved to Excel when you:
+- Press Pause
+- Press Reset
+- Click Save Prems
 
-Tips:
-1. Manually calculate your xp/kill, insert number into "Total XP per Kill" to have it track "Total XP" & XP/h correcly.
-2. Finetune Pixel and Capture numbers. For fast killers make the time shorter.
-3. Make the Status bar not transparent. In Gold Theme Menu→Options→Interface→Opacity 100% or use Original Theme for non transparent Status window.
-4. Pixel is the amount of pixel change it needs to count as kill, play around with this number, worked good for me with .5% (0.005 )
+**Log Location:** `Documents/FlyffMobTracker/sessions.xlsx`
 
-(Haven't tried AOE, Don't think it will work accurately with the method I'm using. Feel free to come with suggestions to track AOE as well!)
+**Logged Data:**
+| Column | Description |
+|--------|-------------|
+| Date | Session date |
+| Start Time | When session started |
+| End Time | When session ended/paused |
+| Duration | Total active time |
+| Total mobs | Number of mobs |
+| Total XP | XP gained (calculated) |
+| XP/Hour | Average XP per hour |
+| XP/mob | Calibrated XP per mob |
+| Level Ups | Number of level-ups |
+| Notes | Start/End XP (e.g., "Start: 45.32% → End: 78.91% (+1 lvl)") |
 
-Happy Flyffing!
+## Troubleshooting
+
+### GPT Calibration Fails
+- Check your API key in `Documents/FlyffMobTracker/gpt-config.json`
+- Ensure the XP bar capture area shows clear, readable digits
+- Try fine-tuning the capture area
+
+### mobs Not Detected
+- Increase "Pixel diff trigger" if missing mobs
+- Decrease it if detecting false positives
+- Adjust "Cooldown" for faster/slower mob rates
+- Make sure the capture area is on the XP digits only
+
+### Level-Up Not Detected
+- The app checks when "Mobs to Level" reaches 0
+- Also checks during periodic sanity checks (every 3 minutes)
+- If XP/mob changed significantly after leveling, use "New Mob" to recalibrate
+
+### Excel Not Saving
+- Check write permissions in Documents folder
+- Close Excel if the file is open
+- Check `Documents/FlyffMobTracker/` folder exists
+
+## Technical Details
+
+- **Framework:** Electron 32
+- **XP Reading:** OpenAI GPT-4 Vision API
+- **mob Detection:** Pixel difference algorithm on XP bar region
+- **Data Storage:** Local JSON config + XLSX session logs
+
+### File Structure
+```
+Documents/FlyffMobTracker/
+├── gpt-config.json    # API key (optional)
+└── sessions.xlsx      # Session log
+```
+
+## Privacy & Security
+
+- **API Key:** Stored locally, never transmitted except to OpenAI
+- **Screenshots:** Only the XP bar region is captured and sent to GPT
+- **No Telemetry:** The app doesn't collect or send any analytics
+- **Local Storage:** All data stays on your computer
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests.
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+## Acknowledgments
+
+- Flyff Universe by Gala Lab
+- OpenAI for GPT-4 Vision API
+- Electron framework
+
+---
+
+**Disclaimer:** This tool is for personal use. Use responsibly and in accordance with Flyff Universe's Terms of Service.
