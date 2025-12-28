@@ -45,15 +45,6 @@ A desktop application for tracking mobs, XP, and session statistics in Flyff Uni
 2. Download `Flyff Session Launcher Setup X.X.X.exe` (installer) or the portable version
 3. Run and enjoy!
 
-### Build from Source
-```bash
-git clone https://github.com/Syjster/flyffmobtracker.git
-cd flyffmobtracker
-npm install
-npm start        # Run in development
-npm run dist     # Build installer
-```
-
 ## 🔧 Setup
 
 ### 1. Configure API Key (Required for XP calibration)
